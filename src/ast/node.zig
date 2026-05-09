@@ -2,77 +2,77 @@ const std = @import("std");
 const lexer = @import("../lexer/lexer.zig");
 const Token = lexer.Token;
 
-/// All the kinds of AST nodes Razen can produce.
+// Every kind of AST node Razen can produce.
 pub const ASTNodeType = enum {
     Invalid,
 
-    // ── Literals ──────────────────────────────────────────────────────────
+    // ── values you write literally in code ────────────────────────────────
     IntegerLiteral,
     FloatLiteral,
     StringLiteral,
     CharLiteral,
     BoolLiteral,
 
-    // ── Declarations ──────────────────────────────────────────────────────
-    /// `name : type = expr;`  or  `name := expr;`  or  `mut name : type = expr;`
+    // ── declarations ──────────────────────────────────────────────────────
+    // name : type = expr;   or  name := expr;  or  mut name : type = expr;
     VarDeclaration,
-    /// `const NAME : type = expr;`
+    // const NAME : type = expr;
     ConstDeclaration,
-    /// `func name(params) -> ret_type { body }`
+    // func name(params) -> ret_type { body }
     FunctionDeclaration,
-    /// A single function parameter  `name: type`
+    // a single function parameter  name: type
     Parameter,
-    Parameters, // list of Parameter nodes
+    Parameters, // the whole list of parameters
 
-    // ── Type nodes ────────────────────────────────────────────────────────
-    VarType, // holds the token for a type keyword / identifier
+    // ── type nodes ────────────────────────────────────────────────────────
+    VarType,    // holds the actual type keyword or identifier
     ReturnType,
 
-    // ── Expressions ───────────────────────────────────────────────────────
-    BinaryExpression, // a + b, a == b, …
-    UnaryExpression, // -x, !x
-    Identifier, // a named reference
+    // ── expressions ───────────────────────────────────────────────────────
+    BinaryExpression,  // a + b, a == b, that kind of thing
+    UnaryExpression,   // -x, !x
+    Identifier,        // a name that refers to something
 
-    // ── Statements ────────────────────────────────────────────────────────
-    ReturnStatement, // `ret expr`
-    Assignment, // `name = expr` / `name += expr`
+    // ── statements ────────────────────────────────────────────────────────
+    ReturnStatement, // ret expr
+    Assignment,      // name = expr  or  name += expr
 
-    // ── Block / body ──────────────────────────────────────────────────────
+    // ── block / body ──────────────────────────────────────────────────────
     Block, // { stmts… }
 
-    // ── Control flow ──────────────────────────────────────────────────────
+    // ── control flow ──────────────────────────────────────────────────────
     IfStatement, // if cond { … } else { … }
     IfBody,
     ElseBody,
     LoopStatement, // loop { … }
     LoopBody,
 
-    // ── Function call ─────────────────────────────────────────────────────
+    // ── function calls ────────────────────────────────────────────────────
     FunctionCall, // name(args…)
-    Argument, // single argument inside a call
+    Argument,     // one argument inside a call
 
-    // ── Comments ──────────────────────────────────────────────────────────
+    // ── comments ──────────────────────────────────────────────────────────
     Comment,
 };
 
-/// A single node in the Razen AST.
-/// Uses value semantics where possible (token is copied).
+// One node in the Razen AST.
+// Copies the token by value so we don't have to worry about lifetime.
 pub const ASTNode = struct {
     node_type: ASTNodeType = ASTNodeType.Invalid,
 
-    /// The token that best represents this node (name, operator, literal…)
+    // the token that best represents this node (name, operator, literal, etc.)
     token: ?Token = null,
 
-    /// Left child (e.g. type in declaration, left operand in binary expr)
+    // left child — usually: type in a declaration, left operand in a binary expr
     left: ?*ASTNode = null,
-    /// Middle child (e.g. condition in if, params list)
+    // middle child — condition in if, params list in a function, etc.
     middle: ?*ASTNode = null,
-    /// Right child (e.g. value in declaration, right operand in binary expr)
+    // right child — value in a declaration, right operand in a binary expr
     right: ?*ASTNode = null,
-    /// Child list (e.g. function body statements, argument list)
+    // variable-length child list — function body statements, argument list, etc.
     children: ?*std.ArrayList(*ASTNode) = null,
 
-    // ── Flags ─────────────────────────────────────────────────────────────
+    // ── flags ──────────────────────────────────────────────────────────────
     is_const: bool = false,
     is_mut: bool = false,
     is_global: bool = false,

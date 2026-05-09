@@ -1,13 +1,14 @@
-/// Phase 2 sample — exercises the full Razen syntax understood in Phase 2:
-///   • const declarations
-///   • mutable variable declarations with explicit types and inferred types
-///   • function declarations with parameters and return types
-///   • binary expressions (arithmetic, comparison, logical)
-///   • if / else blocks
-///   • loop + break
-///   • return statements
-///   • assignment and compound-assignment
-///   • function calls
+// sample code strings used to test the parser and AST builder
+// covers most of what Phase 2 can handle:
+//   - const declarations
+//   - mutable variables with explicit and inferred types
+//   - function declarations with params and return types
+//   - arithmetic, comparison, and logical expressions
+//   - if / else blocks
+//   - loops and break
+//   - return statements
+//   - assignment and compound assignment
+//   - function calls
 pub const FULL_PROGRAM =
     \\const MAX : i32 = 100
     \\
@@ -38,14 +39,14 @@ pub const FULL_PROGRAM =
     \\}
 ;
 
-/// Minimal sample — just a returning main.
+// the simplest possible program — just returns zero
 pub const RETURN_ZERO =
     \\func main() -> i32 {
     \\    ret 0
     \\}
 ;
 
-/// Arithmetic expressions only.
+// a couple of arithmetic expressions to make sure precedence is working right
 pub const ARITH_EXPR =
     \\func compute() -> i32 {
     \\    a : i32 = 3 + 4 * 2
@@ -54,7 +55,7 @@ pub const ARITH_EXPR =
     \\}
 ;
 
-/// if / else sample.
+// basic if/else to test the branch parsing
 pub const IF_ELSE =
     \\func check(n: i32) -> bool {
     \\    if n > 0 {

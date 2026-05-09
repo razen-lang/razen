@@ -7,7 +7,7 @@ const Token = lexer.Token;
 const ASTNode = node_mod.ASTNode;
 const ASTNodeType = node_mod.ASTNodeType;
 
-// ── Colours ─────────────────────────────────────────────────────────────────
+// pull the colours in with shorter names so the print calls aren't so noisy
 const RST = lexer.RESET;
 const GREY = lexer.GREY;
 const ORANGE = lexer.ORANGE;
@@ -21,9 +21,7 @@ const BLUE = lexer.BLUE;
 const RED = lexer.RED;
 const YELLOW = lexer.YELLOW;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Token list printer
-// ─────────────────────────────────────────────────────────────────────────────
+// ── token list printer ────────────────────────────────────────────────────────
 
 pub fn printTokens(token_list: *ArrayList(Token)) void {
     const n = token_list.items.len;
@@ -48,9 +46,7 @@ pub fn printTokens(token_list: *ArrayList(Token)) void {
     print("\n", .{});
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// AST printer
-// ─────────────────────────────────────────────────────────────────────────────
+// ── AST printer ───────────────────────────────────────────────────────────────
 
 pub fn printAST(ast_nodes: *ArrayList(*ASTNode)) void {
     const n = ast_nodes.items.len;
@@ -62,37 +58,35 @@ pub fn printAST(ast_nodes: *ArrayList(*ASTNode)) void {
         print("  {s}(empty){s}\n", .{ GREY, RST });
     } else {
         for (ast_nodes.items) |node| {
-            print("  ", .{}); // indent for top-level
+            print("  ", .{}); // top-level nodes get one level of indent
             printNode(node, 1);
         }
     }
     print("\n", .{});
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Recursive node tree printer
-// ─────────────────────────────────────────────────────────────────────────────
+// ── recursive node tree printer ───────────────────────────────────────────────
 
 pub fn printNode(n: *const ASTNode, depth: usize) void {
-    // Node type — coloured by category
+    // node type coloured by what kind it is
     print("{s}{s}{s}", .{ nodeColour(n.node_type), @tagName(n.node_type), RST });
 
-    // Value token (name, operator, literal…)
+    // if the node has a token (name, operator, literal…) print it too
     if (n.token) |tok| {
         if (tok.value.len > 0) {
             print("  {s}{s}{s}", .{ ORANGE, tok.value, RST });
         }
     }
 
-    // Flags — same line, muted
-    if (n.is_pub)   print("  {s}pub{s}",   .{ GREY, RST });
-    if (n.is_const) print("  {s}const{s}", .{ GREY, RST });
-    if (n.is_mut)   print("  {s}mut{s}",   .{ GREY, RST });
+    // flags on the same line, shown in muted grey
+    if (n.is_pub)    print("  {s}pub{s}",    .{ GREY, RST });
+    if (n.is_const)  print("  {s}const{s}",  .{ GREY, RST });
+    if (n.is_mut)    print("  {s}mut{s}",    .{ GREY, RST });
     if (n.is_global) print("  {s}global{s}", .{ GREY, RST });
 
     print("\n", .{});
 
-    // Children
+    // print children
     if (n.left)   |l| { printChild(depth, "left",  l); }
     if (n.middle) |m| { printChild(depth, "mid",   m); }
     if (n.right)  |r| { printChild(depth, "right", r); }
@@ -105,15 +99,15 @@ pub fn printNode(n: *const ASTNode, depth: usize) void {
 }
 
 fn printChild(depth: usize, label: []const u8, child: *const ASTNode) void {
-    // 2 spaces per depth level for the branch
+    // indent by 2 spaces per depth level
     var i: usize = 0;
     while (i < depth) : (i += 1) print("  ", .{});
-    
-    // Print the tree branch, label and then delegate to printNode
+
     print("{s}└─ {s}:{s} ", .{ GREY, label, RST });
     printNode(child, depth + 1);
 }
 
+// pick a colour based on the node category so the tree is easier to read at a glance
 fn nodeColour(nt: ASTNodeType) []const u8 {
     return switch (nt) {
         .FunctionDeclaration              => LGREEN,

@@ -1,11 +1,9 @@
 const token = @import("../lexer/token.zig");
 const TokenType = token.TokenType;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Type classification helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// ── type classification ───────────────────────────────────────────────────────
 
-/// True for any primitive / built-in type keyword.
+// checks if a token is one of the primitive/built-in type keywords
 pub fn isVarType(tt: TokenType) bool {
     return switch (tt) {
         TokenType.I1,
@@ -45,7 +43,7 @@ pub fn isVarType(tt: TokenType) bool {
     };
 }
 
-/// True for integer-family types (signed + unsigned).
+// true for any signed or unsigned integer type
 pub fn isIntegerType(tt: TokenType) bool {
     return switch (tt) {
         TokenType.I1,
@@ -73,7 +71,7 @@ pub fn isIntegerType(tt: TokenType) bool {
     };
 }
 
-/// True for float-family types.
+// true for float types
 pub fn isFloatType(tt: TokenType) bool {
     return switch (tt) {
         TokenType.F16, TokenType.F32, TokenType.F64, TokenType.F128, TokenType.Float => true,
@@ -81,19 +79,17 @@ pub fn isFloatType(tt: TokenType) bool {
     };
 }
 
-/// True for any numeric type (int or float).
+// true for any number type — int or float
 pub fn isNumericType(tt: TokenType) bool {
     return isIntegerType(tt) or isFloatType(tt);
 }
 
-/// A "type token" is a primitive type keyword OR an Identifier (custom type).
+// a "type token" covers all built-in types AND user-defined type names (identifiers)
 pub fn isTypeToken(tt: TokenType) bool {
     return isVarType(tt) or tt == TokenType.Identifier;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Literal / value helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// ── literal / value helpers ───────────────────────────────────────────────────
 
 pub fn isLiteral(tt: TokenType) bool {
     return switch (tt) {
@@ -108,11 +104,9 @@ pub fn isLiteral(tt: TokenType) bool {
     };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Operator helpers
-// ─────────────────────────────────────────────────────────────────────────────
+// ── operator helpers ──────────────────────────────────────────────────────────
 
-/// True for every token that can appear as a binary infix operator.
+// true for anything that can sit between two expressions as a binary operator
 pub fn isBinaryOperator(tt: TokenType) bool {
     return switch (tt) {
         TokenType.Plus,
@@ -138,7 +132,7 @@ pub fn isBinaryOperator(tt: TokenType) bool {
     };
 }
 
-/// True for compound-assignment operators: +=, -=, *=, /=, %=
+// true for assignment operators: =, +=, -=, *=, /=, %=
 pub fn isAssignmentOperator(tt: TokenType) bool {
     return switch (tt) {
         TokenType.Equals,
@@ -152,9 +146,9 @@ pub fn isAssignmentOperator(tt: TokenType) bool {
     };
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Precedence  (higher = tighter binding)
-// ─────────────────────────────────────────────────────────────────────────────
+// ── operator precedence ───────────────────────────────────────────────────────
+//
+// Higher number = binds tighter.
 //
 //   1  ||
 //   2  &&

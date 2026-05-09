@@ -3,9 +3,12 @@ const lexer = @import("../lexer/lexer.zig");
 const TokenType = token.TokenType;
 const twoSlicesAreTheSame = lexer.twoSlicesAreTheSame;
 
+// maps a raw text slice to its corresponding TokenType
+// works by checking the text against every known keyword, operator, type name, etc.
+// if nothing matches, it falls through to number detection and then defaults to Identifier
 pub fn getTokenType(source: []const u8) TokenType {
 
-    // Types
+    // ── built-in types ────────────────────────────────────────────────────
     if (twoSlicesAreTheSame(source, token.I1)) return TokenType.I1;
     if (twoSlicesAreTheSame(source, token.I2)) return TokenType.I2;
     if (twoSlicesAreTheSame(source, token.I4)) return TokenType.I4;
@@ -39,7 +42,7 @@ pub fn getTokenType(source: []const u8) TokenType {
     if (twoSlicesAreTheSame(source, token.STR)) return TokenType.Str;
     if (twoSlicesAreTheSame(source, token.STRING)) return TokenType.String;
 
-    // Keywords
+    // ── keywords ──────────────────────────────────────────────────────────
     if (twoSlicesAreTheSame(source, token.TYPE)) return TokenType.Type;
     if (twoSlicesAreTheSame(source, token.ENUM)) return TokenType.Enum;
     if (twoSlicesAreTheSame(source, token.UNION)) return TokenType.Union;
@@ -67,7 +70,7 @@ pub fn getTokenType(source: []const u8) TokenType {
     if (twoSlicesAreTheSame(source, token.TRUE)) return TokenType.True;
     if (twoSlicesAreTheSame(source, token.FALSE)) return TokenType.False;
 
-    // Operators
+    // ── operators ─────────────────────────────────────────────────────────
     if (twoSlicesAreTheSame(source, token.EQUALS)) return TokenType.Equals;
     if (twoSlicesAreTheSame(source, token.COLON_EQUALS)) return TokenType.ColonEquals;
     if (twoSlicesAreTheSame(source, token.PLUS_EQUALS)) return TokenType.PlusEquals;
@@ -114,17 +117,19 @@ pub fn getTokenType(source: []const u8) TokenType {
     if (twoSlicesAreTheSame(source, token.DOT_DOT_EQUALS)) return TokenType.DotDotEquals;
     if (twoSlicesAreTheSame(source, token.AT)) return TokenType.At;
 
-    // Number literals
+    // ── number literals ───────────────────────────────────────────────────
     if (isInteger(source)) return TokenType.IntegerValue;
     if (isDecimal(source)) return TokenType.DecimalValue;
 
-    // String or Char value
-    if (lexer.contains(source, '"')) return TokenType.StringValue;
+    // ── string / char value (already surrounded by quotes at this point) ──
+    if (lexer.contains(source, '"'))  return TokenType.StringValue;
     if (lexer.contains(source, '\'')) return TokenType.CharValue;
 
+    // nothing else matched, must be a user-defined name
     return TokenType.Identifier;
 }
 
+// checks if a character is a recognised operator starter
 pub fn isOperator(char: u8) bool {
     const LENGTH: usize = token.OPERATORS.len;
     for (0..LENGTH) |i| {
@@ -135,6 +140,7 @@ pub fn isOperator(char: u8) bool {
     return false;
 }
 
+// checks if a character is a separator (brackets, punctuation, whitespace control chars)
 pub fn isSeparator(char: u8) bool {
     const LENGTH: usize = token.SEPERATORS.len;
     for (0..LENGTH) |i| {
@@ -145,12 +151,14 @@ pub fn isSeparator(char: u8) bool {
     return false;
 }
 
+// returns true if the whole slice looks like an integer (optionally negative)
 pub fn isInteger(source: []const u8) bool {
     const LENGTH: usize = source.len;
 
     for (0..LENGTH) |i| {
         const char: u8 = source[i];
         if (source[i] == '-') {
+            // a leading minus is fine, but not mid-number
             if (i != 0) {
                 return false;
             }
@@ -163,6 +171,7 @@ pub fn isInteger(source: []const u8) bool {
     return true;
 }
 
+// returns true if the slice looks like a decimal number (optionally negative, has a dot)
 pub fn isDecimal(source: []const u8) bool {
     const LENGTH: usize = source.len;
 
@@ -175,7 +184,7 @@ pub fn isDecimal(source: []const u8) bool {
             continue;
         }
         if (source[i] == '.') {
-            continue;
+            continue; // dots are allowed in decimals
         }
         if (isDigit(char) == false) {
             return false;
@@ -184,6 +193,7 @@ pub fn isDecimal(source: []const u8) bool {
     return true;
 }
 
+// true for a-z, A-Z, 0-9
 pub fn isLetterOrDigit(char: u8) bool {
     switch (char) {
         'a'...'z', 'A'...'Z', '0'...'9' => return true,
@@ -191,6 +201,7 @@ pub fn isLetterOrDigit(char: u8) bool {
     }
 }
 
+// true for 0-9
 pub fn isDigit(char: u8) bool {
     switch (char) {
         '0'...'9' => return true,

@@ -10,6 +10,10 @@ const ArenaAllocator = std.heap.ArenaAllocator;
 const Allocator = std.mem.Allocator;
 const Token = lexer.Token;
 
+// runs a source string through the full pipeline:
+//   Phase 1 — lex it into tokens
+//   Phase 2 — build an AST from those tokens
+// prints the results of each phase so we can see what's happening
 fn convertCode(source: []const u8) void {
     print("\n{s}Source:{s}\n{s}\n\n", .{ lexer.GREY, lexer.RESET, source });
 
@@ -19,7 +23,7 @@ fn convertCode(source: []const u8) void {
 
     var arena_allocator: Allocator = arena.allocator();
 
-    // ── Phase 1 : Lex / Tokenise ─────────────────────────────────────────
+    // ── Phase 1: lex the source into tokens ──────────────────────────────
     print("{s}Phase 1{s}  ", .{ lexer.CREAM, lexer.RESET });
     const token_list = parser.parseToTokens(&arena_allocator, source) catch |err| {
         print("{s}Lexer error: {}{s}\n", .{ lexer.RED, err, lexer.RESET });
@@ -28,7 +32,7 @@ fn convertCode(source: []const u8) void {
 
     debugging.printTokens(token_list);
 
-    // ── Phase 2 : Build AST ───────────────────────────────────────────────
+    // ── Phase 2: build the AST from the token list ────────────────────────
     print("{s}Phase 2{s}  ", .{ lexer.CREAM, lexer.RESET });
     const ast_nodes = ast_builder.buildAST(&arena_allocator, token_list, source) catch |err| {
         print("{s}AST error: {}{s}\n", .{ lexer.RED, err, lexer.RESET });

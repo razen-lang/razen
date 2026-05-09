@@ -6,6 +6,7 @@ const TokenType = token.TokenType;
 const UsizeConversionError = errors.UsizeConversionError;
 // const print = std.debug.print;
 
+// ANSI colour codes — used throughout the compiler output to make things readable
 pub const RED = "\x1b[31m";
 pub const RESET = "\x1b[0m";
 pub const GREEN = "\x1b[32m";
@@ -25,7 +26,7 @@ pub const Lexer = struct {
     last_token: ?Token = null,
     character_index: usize = 0,
     source: []const u8 = "",
-    line_count: usize = 0, // for token position
+    line_count: usize = 0, // used to track which line we're on
     character_count: usize = 0,
     was_comment: bool = false,
 };
@@ -49,6 +50,8 @@ pub const Token = struct {
         return self.token_type == token_type;
     }
 };
+
+// ── print helpers — small wrappers so callsites stay clean ───────────────────
 
 pub fn printNumberSlice(comptime T: type, source: []const T) void {
     std.debug.print("{any}", .{source});
@@ -102,6 +105,7 @@ pub fn printTypeOfVariable(source: anytype) void {
     std.debug.print("Type: {}\n", .{@TypeOf(source)});
 }
 
+// prints a float with the given number of decimal places (0-15)
 pub fn printFloat(source: anytype, decimal_point_count: u4) void {
     switch (decimal_point_count) {
         0 => std.debug.print("{any}", .{source}),
@@ -120,10 +124,11 @@ pub fn printFloat(source: anytype, decimal_point_count: u4) void {
         13 => std.debug.print("{any:.13}", .{source}),
         14 => std.debug.print("{any:.14}", .{source}),
         15 => std.debug.print("{any:.15}", .{source}),
-        else => std.debug.print("{any}", .{source}), // default case
+        else => std.debug.print("{any}", .{source}), // just fall back to default
     }
 }
 
+// same as printFloat but adds a newline at the end
 pub fn printlnFloat(source: anytype, decimal_point_count: u4) void {
     switch (decimal_point_count) {
         0 => std.debug.print("{any}\n", .{source}),
@@ -142,7 +147,7 @@ pub fn printlnFloat(source: anytype, decimal_point_count: u4) void {
         13 => std.debug.print("{any:.13}\n", .{source}),
         14 => std.debug.print("{any:.14}\n", .{source}),
         15 => std.debug.print("{any:.15}\n", .{source}),
-        else => std.debug.print("{any}\n", .{source}), // default case
+        else => std.debug.print("{any}\n", .{source}), // fall back to default
     }
 }
 
@@ -162,6 +167,7 @@ pub fn printBitsU8(source: u8) void {
     std.debug.print("{s} ", .{output[0..]});
 }
 
+// returns false if index is out of bounds — handy for bounds checking before indexing
 pub fn isIndexInRange(max: usize, index: usize) bool {
     if (index >= max) {
         return false;
@@ -169,6 +175,7 @@ pub fn isIndexInRange(max: usize, index: usize) bool {
     return true;
 }
 
+// converts any negative-able integer to usize, errors if the value is negative
 pub fn convertIndexToUsize(source: anytype) !usize {
     if (source < 0) {
         return UsizeConversionError.OutOfRange;
@@ -176,6 +183,7 @@ pub fn convertIndexToUsize(source: anytype) !usize {
     return @intCast(source);
 }
 
+// compares two byte slices — returns true if they are byte-for-byte identical
 pub fn twoSlicesAreTheSame(first_slice: []const u8, second_slice: []const u8) bool {
     const FIRST_SLICE_LENGTH: usize = first_slice.len;
 
@@ -190,6 +198,7 @@ pub fn twoSlicesAreTheSame(first_slice: []const u8, second_slice: []const u8) bo
     return true;
 }
 
+// checks if a byte slice contains a particular character
 pub fn contains(slice: []const u8, char: u8) bool {
     const LENGTH: usize = slice.len;
 

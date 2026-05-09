@@ -6,7 +6,8 @@ const ASTNodeType = node.ASTNodeType;
 const AstError = errors.AstError;
 const Allocator = std.mem.Allocator;
 
-/// Allocate a new ASTNode with every field zeroed / null.
+// make a fresh AST node with everything set to null/defaults
+// use this whenever you need a blank node to fill in
 pub fn createDefaultAstNode(allocator: *Allocator) AstError!*ASTNode {
     const n: *ASTNode = allocator.*.create(ASTNode) catch {
         return AstError.Out_Of_Memory;
@@ -24,7 +25,7 @@ pub fn createDefaultAstNode(allocator: *Allocator) AstError!*ASTNode {
     return n;
 }
 
-/// Allocate a new ASTNode with a specific type and token pre-set.
+// same as above but lets you set the node type up front
 pub fn createAstNode(
     allocator: *Allocator,
     node_type: ASTNodeType,
@@ -34,7 +35,7 @@ pub fn createAstNode(
     return n;
 }
 
-/// Allocate a new ArrayList(*ASTNode) on the heap (arena-friendly).
+// allocate a child list on the heap — works well with arena allocators
 pub fn createChildList(allocator: *Allocator) AstError!*std.ArrayList(*ASTNode) {
     const list = allocator.*.create(std.ArrayList(*ASTNode)) catch {
         return AstError.Out_Of_Memory;
@@ -43,7 +44,7 @@ pub fn createChildList(allocator: *Allocator) AstError!*std.ArrayList(*ASTNode) 
     return list;
 }
 
-/// Append a child to a node's children list, creating it lazily if needed.
+// add a child to a node — creates the children list on demand if it doesn't exist
 pub fn appendChild(
     allocator: *Allocator,
     parent: *ASTNode,

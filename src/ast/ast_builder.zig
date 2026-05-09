@@ -1,29 +1,29 @@
-/// ast_builder.zig — Razen Phase 2
-///
-/// Walks the token list produced by Phase 1 and builds a list of top-level
-/// ASTNode trees.
-///
-/// Declaration forms supported:
-///   name : type = expr;          immutable, explicit type
-///   name : type;                 immutable, zero-init
-///   name := expr;                immutable, inferred type
-///   mut name : type = expr;      mutable, explicit type
-///   mut name := expr;            mutable, inferred type
-///   const NAME : type = expr;    compile-time constant
-///   const func name(…) -> T { }  const function
-///
-/// Statement forms inside function bodies:
-///   ret expr                     return statement
-///   name = expr;                 simple assignment
-///   name += expr;  (etc.)         compound assignment
-///   if cond { … } else { … }     conditional
-///   loop { … }                   infinite loop
-///   break / skip                 loop control
-///   name(args…);                 expression statement / function call
-///
-/// Function declaration:
-///   func name(params) -> ret { body }
-///   pub func …
+// ast_builder.zig — Razen Phase 2
+//
+// This is the main thing that turns a flat list of tokens into a tree.
+// It walks through the token list from Phase 1 and builds top-level AST nodes.
+//
+// What it can handle right now:
+//   name : type = expr;          just a variable with an explicit type
+//   name : type;                 variable with no initial value (zero init)
+//   name := expr;                variable where the type gets figured out from the value
+//   mut name : type = expr;      same but mutable
+//   mut name := expr;            mutable + inferred type
+//   const NAME : type = expr;    compile-time constant
+//   const func name(…) -> T { }  a constant function
+//
+// Inside function bodies you can do:
+//   ret expr                     return something
+//   name = expr;                 assign to a variable
+//   name += expr;  (etc.)        compound assignment
+//   if cond { … } else { … }     if/else, no parens needed
+//   loop { … }                   infinite loop until you break
+//   break / skip                 get out of or skip a loop iteration
+//   name(args…);                 call a function
+//
+// Functions look like:
+//   func name(params) -> ret { body }
+//   pub func …   (public version)
 const std = @import("std");
 const lexer = @import("../lexer/lexer.zig");
 const token_mod = @import("../lexer/token.zig");
@@ -44,11 +44,10 @@ const ASTData = ast_data_mod.ASTData;
 const AstError = errors.AstError;
 const print = std.debug.print;
 
+// just a sanity cap so we never get stuck in an infinite loop
 const MAX_LOOP: usize = 100_000;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Public entry point
-// ─────────────────────────────────────────────────────────────────────────────
+// entry point:
 
 pub fn buildAST(
     allocator: *Allocator,
@@ -86,6 +85,7 @@ pub fn buildAST(
             return err;
         };
 
+        // if we didn't move forward, nudge past the stuck token
         if (before == ast_data.token_index) ast_data.token_index += 1;
     }
 
@@ -93,16 +93,14 @@ pub fn buildAST(
     return ast_nodes;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Global-level dispatcher
-// ─────────────────────────────────────────────────────────────────────────────
+// top-level token dispatcher:
 
 fn processGlobalToken(allocator: *Allocator, d: *ASTData) AstError!void {
     d.error_function = "processGlobalToken";
     const tok: Token = try d.getToken();
 
     switch (tok.token_type) {
-        // Skip comment fences
+        // skip comment markers, they don't produce nodes
         TokenType.Comment, TokenType.EndComment => d.advance(),
 
         // pub func …
@@ -142,16 +140,14 @@ fn processGlobalToken(allocator: *Allocator, d: *ASTData) AstError!void {
         },
 
         else => {
-            // Unknown top-level token: skip with a note
+            // we don't know what this is at the top level, just skip it
             d.setError("Unrecognised token at top level", tok);
             d.advance();
         },
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Statement dispatcher (inside function bodies / blocks)
-// ─────────────────────────────────────────────────────────────────────────────
+// statement dispatcher (inside function bodies / blocks):
 
 fn processStatement(allocator: *Allocator, d: *ASTData, body: *ASTNode) AstError!void {
     d.error_function = "processStatement";
@@ -202,29 +198,27 @@ fn processStatement(allocator: *Allocator, d: *ASTData, body: *ASTNode) AstError
             try ast_utils.appendChild(allocator, body, n);
         },
         else => {
-            // Unknown token inside body — skip
+            // don't know this token inside a body, just skip it
             d.advance();
         },
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Identifier-started statement: declaration, assignment, or expression
-// ─────────────────────────────────────────────────────────────────────────────
+// identifier-started statement: could be a decl, assignment, or plain expr:
 
-/// Decides what kind of statement begins with an Identifier token.
-/// Handles:
-///   name : type = expr;     (explicit declaration)
-///   name := expr;           (inferred declaration)
-///   name = expr;            (simple assignment)
-///   name += expr;  etc.     (compound assignment)
-///   name(args…);            (function call / expression)
+// Figures out what to do when a statement starts with a name.
+// Could be:
+//   name : type = expr;     explicit declaration
+//   name := expr;           inferred declaration
+//   name = expr;            simple assignment
+//   name += expr;  etc.     compound assignment
+//   name(args…);            function call
 fn parseIdentifierStatement(allocator: *Allocator, d: *ASTData, is_mut: bool) AstError!*ASTNode {
-    const name_tok: Token = try d.getToken(); // current = Identifier
-    const nxt = d.peekToken(1); // look one ahead
+    const name_tok: Token = try d.getToken(); // we're sitting on the identifier
+    const nxt = d.peekToken(1); // look one ahead to see what comes next
 
     if (nxt == null) {
-        // End of file after identifier — treat as bare expression
+        // nothing after the name, treat it as a bare expression
         d.advance();
         const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
         n.node_type = ASTNodeType.Identifier;
@@ -234,26 +228,26 @@ fn parseIdentifierStatement(allocator: *Allocator, d: *ASTData, is_mut: bool) As
 
     const nxt_tt = nxt.?.token_type;
 
-    // name : type …    →  explicit declaration
+    // name : type …  ->  explicit declaration
     if (nxt_tt == TokenType.Colon) {
         return try parseVarDecl(allocator, d, is_mut);
     }
-    // name := expr     →  inferred declaration
+    // name := expr   ->  inferred declaration
     if (nxt_tt == TokenType.ColonEquals) {
         return try parseVarDecl(allocator, d, is_mut);
     }
-    // name = expr;  or  name += expr;  etc.
+    // name = expr;  ->  name += expr;  etc.
     if (tok_utils.isAssignmentOperator(nxt_tt)) {
         return try parseAssignment(allocator, d);
     }
-    // name(args…)   →  function-call expression statement
+    // name(args…)  ->  function call
     if (nxt_tt == TokenType.LeftParen) {
         d.advance(); // consume name
         const node: *ASTNode = try parseCallNode(allocator, d, name_tok);
         consumeSemi(d);
         return node;
     }
-    // Bare identifier or other expression
+    // anything else, try to parse it as a binary expression
     const expr = try expr_mod.parseBinaryExpr(allocator, d, 0);
     consumeSemi(d);
     if (expr) |e| return e;
@@ -263,16 +257,15 @@ fn parseIdentifierStatement(allocator: *Allocator, d: *ASTData, is_mut: bool) As
     return n;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// const declaration
-// ─────────────────────────────────────────────────────────────────────────────
+// const declaration:
 
 fn parseConst(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     d.error_function = "parseConst";
-    d.advance(); // consume 'const'
+    d.advance(); // eat the 'const' keyword
 
     const nxt: Token = try d.getToken();
     if (nxt.token_type == TokenType.Func) {
+        // const func — just a function that's also marked const
         const n: *ASTNode = try parseFuncDecl(allocator, d, false);
         n.is_const = true;
         return n;
@@ -285,16 +278,14 @@ fn parseConst(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     return n;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Variable declaration
-// ─────────────────────────────────────────────────────────────────────────────
+// variable declaration:
 
-/// Parses all forms of variable declaration.
-/// Current token when called may be `mut` or the identifier name.
+// Handles all the different ways you can declare a variable.
+// When we get here, the current token might be 'mut' or the name itself.
 fn parseVarDecl(allocator: *Allocator, d: *ASTData, caller_mut: bool) AstError!*ASTNode {
     d.error_function = "parseVarDecl";
 
-    // Consume 'mut' if present at current position
+    // if there's a 'mut' keyword here, consume it
     var is_mut = caller_mut;
     if (d.hasMore()) {
         const cur: Token = try d.getToken();
@@ -304,26 +295,26 @@ fn parseVarDecl(allocator: *Allocator, d: *ASTData, caller_mut: bool) AstError!*
         }
     }
 
-    // Read variable name
+    // grab the variable name
     const name_tok: Token = try d.getToken();
     if (name_tok.token_type != TokenType.Identifier) {
         d.setError("Expected variable name (identifier)", name_tok);
         return AstError.Unexpected_Type;
     }
-    d.advance(); // consume name
+    d.advance(); // move past the name
 
-    // What follows: ':=' (inferred) or ':' (explicit type)
+    // next should be either ':=' (inferred type) or ':' (explicit type)
     const sep: Token = try d.getToken();
 
     if (sep.token_type == TokenType.ColonEquals) {
         // name := expr
-        d.advance(); // consume ':='
+        d.advance(); // eat ':='
         return try finishInferred(allocator, d, name_tok, is_mut);
     }
 
     if (sep.token_type == TokenType.Colon) {
         // name : type [= expr]  or  name : type;
-        d.advance(); // consume ':'
+        d.advance(); // eat ':'
         return try finishExplicit(allocator, d, name_tok, is_mut, false);
     }
 
@@ -331,7 +322,7 @@ fn parseVarDecl(allocator: *Allocator, d: *ASTData, caller_mut: bool) AstError!*
     return AstError.Unexpected_Type;
 }
 
-/// Finish:  name := expr;
+// finish up:  name := expr;
 fn finishInferred(
     allocator: *Allocator,
     d: *ASTData,
@@ -343,13 +334,13 @@ fn finishInferred(
 
     const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
     n.node_type = ASTNodeType.VarDeclaration;
-    n.token = name_tok; // name stored in .token, type inferred (no left child)
+    n.token = name_tok; // name goes in .token, no type node since it's inferred
     n.right = value;
     n.is_mut = is_mut;
     return n;
 }
 
-/// Finish:  name : type [= expr] ;
+// finish up:  name : type [= expr] ;
 fn finishExplicit(
     allocator: *Allocator,
     d: *ASTData,
@@ -357,13 +348,13 @@ fn finishExplicit(
     is_mut: bool,
     is_global: bool,
 ) AstError!*ASTNode {
-    // Type token
+    // the type keyword comes right after the ':'
     const type_tok: Token = try d.getToken();
     if (!tok_utils.isTypeToken(type_tok.token_type)) {
         d.setError("Expected type after ':' in declaration", type_tok);
         return AstError.Unexpected_Type;
     }
-    d.advance(); // consume type
+    d.advance(); // eat the type
 
     const type_node: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
     type_node.node_type = ASTNodeType.VarType;
@@ -376,33 +367,31 @@ fn finishExplicit(
     n.is_mut = is_mut;
     n.is_global = is_global;
 
-    // Optional '= expr'
+    // an '= expr' part is optional, check for it
     if (d.hasMore()) {
         const eq_or_semi: Token = try d.getToken();
         if (eq_or_semi.token_type == TokenType.Equals) {
-            d.advance(); // consume '='
+            d.advance(); // eat '='
             n.right = try expr_mod.parseBinaryExpr(allocator, d, 0);
             consumeSemi(d);
         } else if (eq_or_semi.token_type == TokenType.Semicolon) {
-            d.advance(); // consume ';', no initialiser
+            d.advance(); // eat ';', no value was given
         }
-        // If neither, leave as-is (leniency for missing ';')
+        // if neither, just leave it — we're lenient about missing semicolons
     }
 
     return n;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Assignment     name = expr;   name += expr;  etc.
-// ─────────────────────────────────────────────────────────────────────────────
+// assignment  name = expr;   name += expr;  etc.:
 
 fn parseAssignment(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     d.error_function = "parseAssignment";
 
     const name_tok: Token = try d.getToken();
-    d.advance(); // consume name
+    d.advance(); // eat the name
     const op_tok: Token = try d.getToken();
-    d.advance(); // consume operator
+    d.advance(); // eat the operator
 
     const value = try expr_mod.parseBinaryExpr(allocator, d, 0);
     consumeSemi(d);
@@ -413,42 +402,40 @@ fn parseAssignment(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
 
     const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
     n.node_type = ASTNodeType.Assignment;
-    n.token = op_tok; // operator as identity
+    n.token = op_tok; // the operator token is stored here
     n.left = id;
     n.right = value;
     return n;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Function declaration
-// ─────────────────────────────────────────────────────────────────────────────
+// function declaration:
 
-/// Parse:  func name(params) -> ret_type { body }
-/// Current token = 'func' when called.
+// Parses:  func name(params) -> ret_type { body }
+// We get here with the current token sitting on 'func'.
 fn parseFuncDecl(allocator: *Allocator, d: *ASTData, is_pub: bool) AstError!*ASTNode {
     d.error_function = "parseFuncDecl";
-    d.advance(); // consume 'func'
+    d.advance(); // eat 'func'
 
-    // Function name
+    // function name
     const name_tok: Token = try d.getToken();
     if (name_tok.token_type != TokenType.Identifier) {
         d.setError("Expected function name after 'func'", name_tok);
         return AstError.Unexpected_Type;
     }
-    d.advance(); // consume name
+    d.advance(); // eat the name
 
-    // '('
+    // we need a '(' next
     const lp: Token = try d.getToken();
     if (lp.token_type != TokenType.LeftParen) {
         d.setError("Expected '(' after function name", lp);
         return AstError.Unexpected_Type;
     }
-    d.advance(); // consume '('
+    d.advance(); // eat '('
 
-    // Parameters list
+    // parse the parameter list
     const params: *ASTNode = try parseParams(allocator, d);
 
-    // Optional '->'
+    // -> is optional (void functions might skip it)
     if (d.hasMore()) {
         const maybe_arrow: Token = try d.getToken();
         if (maybe_arrow.token_type == TokenType.Arrow) {
@@ -456,7 +443,7 @@ fn parseFuncDecl(allocator: *Allocator, d: *ASTData, is_pub: bool) AstError!*AST
         }
     }
 
-    // Return type
+    // return type
     const ret_node: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
     ret_node.node_type = ASTNodeType.ReturnType;
     if (d.hasMore()) {
@@ -467,7 +454,7 @@ fn parseFuncDecl(allocator: *Allocator, d: *ASTData, is_pub: bool) AstError!*AST
         }
     }
 
-    // Body block
+    // the function body
     const body: *ASTNode = try parseBlock(allocator, d);
 
     const func: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
@@ -480,9 +467,7 @@ fn parseFuncDecl(allocator: *Allocator, d: *ASTData, is_pub: bool) AstError!*AST
     return func;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Parameter list    (  name: type, …  )   — '(' already consumed
-// ─────────────────────────────────────────────────────────────────────────────
+// parameter list    (  name: type, …  )   — '(' already consumed:
 
 fn parseParams(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     d.error_function = "parseParams";
@@ -498,7 +483,7 @@ fn parseParams(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
 
         const cur: Token = try d.getToken();
         if (cur.token_type == TokenType.RightParen) {
-            d.advance(); // consume ')'
+            d.advance(); // eat ')'
             break;
         }
 
@@ -507,7 +492,7 @@ fn parseParams(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
             d.setError("Expected parameter name", cur);
             return AstError.Unexpected_Type;
         }
-        d.advance(); // consume param name
+        d.advance(); // eat param name
 
         // ':'
         const colon: Token = try d.getToken();
@@ -515,15 +500,15 @@ fn parseParams(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
             d.setError("Expected ':' after parameter name", colon);
             return AstError.Unexpected_Type;
         }
-        d.advance(); // consume ':'
+        d.advance(); // eat ':'
 
-        // type
+        // parameter type
         const type_tok: Token = try d.getToken();
         if (!tok_utils.isTypeToken(type_tok.token_type)) {
             d.setError("Expected type in parameter", type_tok);
             return AstError.Unexpected_Type;
         }
-        d.advance(); // consume type
+        d.advance(); // eat the type
 
         const type_node: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
         type_node.node_type = ASTNodeType.VarType;
@@ -531,12 +516,12 @@ fn parseParams(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
 
         const param: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
         param.node_type = ASTNodeType.Parameter;
-        param.token = cur; // param name
+        param.token = cur; // the param name
         param.left = type_node;
 
         params.children.?.append(allocator.*, param) catch return AstError.Out_Of_Memory;
 
-        // optional ','
+        // comma between params is optional
         if (d.hasMore()) {
             const maybe_comma: Token = try d.getToken();
             if (maybe_comma.token_type == TokenType.Comma) d.advance();
@@ -546,14 +531,12 @@ fn parseParams(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     return params;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Block   { statements… }
-// ─────────────────────────────────────────────────────────────────────────────
+// block   { statements… }
 
 fn parseBlock(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     d.error_function = "parseBlock";
 
-    // consume '{'
+    // eat the opening '{'
     if (d.hasMore()) {
         const b: Token = try d.getToken();
         if (b.token_type == TokenType.LeftBrace) d.advance();
@@ -569,7 +552,7 @@ fn parseBlock(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
 
         const cur: Token = try d.getToken();
         if (cur.token_type == TokenType.RightBrace) {
-            d.advance(); // consume '}'
+            d.advance(); // eat '}'
             break;
         }
 
@@ -579,9 +562,7 @@ fn parseBlock(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     return block;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Function call node (name already consumed, current token = '(')
-// ─────────────────────────────────────────────────────────────────────────────
+// function call (name already consumed, sitting on '(')
 
 fn parseCallNode(allocator: *Allocator, d: *ASTData, name_tok: Token) AstError!*ASTNode {
     const call: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
@@ -589,7 +570,7 @@ fn parseCallNode(allocator: *Allocator, d: *ASTData, name_tok: Token) AstError!*
     call.token = name_tok;
     call.children = try ast_utils.createChildList(allocator);
 
-    d.advance(); // consume '('
+    d.advance(); // eat '('
 
     var guard: usize = 0;
     while (d.hasMore()) {
@@ -610,7 +591,7 @@ fn parseCallNode(allocator: *Allocator, d: *ASTData, name_tok: Token) AstError!*
             call.children.?.append(allocator.*, arg) catch return AstError.Out_Of_Memory;
         }
 
-        // optional ','
+        // optional comma between args
         if (d.hasMore()) {
             const mc: Token = try d.getToken();
             if (mc.token_type == TokenType.Comma) d.advance();
@@ -620,20 +601,18 @@ fn parseCallNode(allocator: *Allocator, d: *ASTData, name_tok: Token) AstError!*
     return call;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Return statement    ret [expr]
-// ─────────────────────────────────────────────────────────────────────────────
+//return statement    ret [expr]
 
 fn parseReturn(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     d.error_function = "parseReturn";
     const ret_tok: Token = try d.getToken();
-    d.advance(); // consume 'ret'
+    d.advance(); // eat 'ret'
 
     const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
     n.node_type = ASTNodeType.ReturnStatement;
     n.token = ret_tok;
 
-    // Optional return value
+    // the return value is optional — 'ret' alone is valid
     if (d.hasMore()) {
         const nxt: Token = try d.getToken();
         if (nxt.token_type != TokenType.Semicolon and
@@ -646,16 +625,14 @@ fn parseReturn(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     return n;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// If / else
-// ─────────────────────────────────────────────────────────────────────────────
+// if / else
 
 fn parseIf(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     d.error_function = "parseIf";
     const if_tok: Token = try d.getToken();
-    d.advance(); // consume 'if'
+    d.advance(); // eat 'if'
 
-    // condition (no parens in Razen)
+    // condition — note: Razen doesn't use parens around the condition
     const cond = try expr_mod.parseBinaryExpr(allocator, d, 0);
 
     const if_body: *ASTNode = try parseBlock(allocator, d);
@@ -667,7 +644,7 @@ fn parseIf(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     n.left = cond;
     n.middle = if_body;
 
-    // optional 'else'
+    // else is optional
     if (d.hasMore()) {
         const maybe_else: Token = try d.getToken();
         if (maybe_else.token_type == TokenType.Else) {
@@ -681,14 +658,12 @@ fn parseIf(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     return n;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Loop    loop { body }
-// ─────────────────────────────────────────────────────────────────────────────
+// loop    loop { body }
 
 fn parseLoop(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     d.error_function = "parseLoop";
     const loop_tok: Token = try d.getToken();
-    d.advance(); // consume 'loop'
+    d.advance(); // eat 'loop'
 
     const body: *ASTNode = try parseBlock(allocator, d);
     body.node_type = ASTNodeType.LoopBody;
@@ -700,9 +675,7 @@ fn parseLoop(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
     return n;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Helper: consume ';' if present
-// ─────────────────────────────────────────────────────────────────────────────
+// helper: eat a ';' if one is sitting there
 
 fn consumeSemi(d: *ASTData) void {
     if (!d.hasMore()) return;

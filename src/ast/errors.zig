@@ -1,3 +1,4 @@
+// all the error types the AST builder can throw
 pub const AstError = error{
     Infinite_While_Loop,
     Index_Out_Of_Range,
@@ -8,5 +9,5 @@ pub const AstError = error{
     Unexpected_End_Of_File,
     Null_Type,
     Out_Of_Memory,
-    OutOfMemory, // std allocator error — merged here so ArrayList.append can propagate
+    OutOfMemory, // the std allocator uses this name, so we include it here too
 };

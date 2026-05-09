@@ -1,8 +1,8 @@
-/// expression.zig
-///
-/// Parses Razen expressions from a token stream.
-/// Implements precedence-climbing (Pratt-style) binary expression parsing,
-/// matching the Video 2 tutorial pattern adapted for Razen's token set.
+// expression.zig
+//
+// Handles parsing expressions from the token stream.
+// Uses a precedence-climbing approach (sometimes called Pratt-style)
+// so that things like  a + b * c  come out to the right tree shape.
 const std = @import("std");
 const lexer = @import("../lexer/lexer.zig");
 const token_mod = @import("../lexer/token.zig");
@@ -20,24 +20,22 @@ const ASTNodeType = node_mod.ASTNodeType;
 const ASTData = ast_data_mod.ASTData;
 const AstError = errors.AstError;
 
+// safety cap just in case something loops forever
 const MAX_LOOP = 10_000;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Primary (leaf) parser
-// ─────────────────────────────────────────────────────────────────────────────
+// ── primary (leaf) parser ─────────────────────────────────────────────────────
 
-/// Parse a single "primary" (leaf) expression node:
-///   IntegerLiteral | FloatLiteral | BoolLiteral | CharLiteral |
-///   StringLiteral | Identifier | FunctionCall | ( expr )
-/// Returns null if the current token cannot start an expression
-/// (so callers can decide to stop without error).
+// Tries to parse the smallest unit of an expression — a literal, a name, a
+// function call, or a parenthesized sub-expression.
+// Returns null if the current token can't start an expression, which is fine —
+// callers use that as a signal to stop rather than crash.
 pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNode {
     if (!ast_data.hasMore()) return null;
 
     const tok: Token = try ast_data.getToken();
 
     switch (tok.token_type) {
-        // ── Integer literal ──────────────────────────────────────────────
+        // ── integer literal ──────────────────────────────────────────────
         TokenType.IntegerValue => {
             const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
             n.node_type = ASTNodeType.IntegerLiteral;
@@ -46,7 +44,7 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             return n;
         },
 
-        // ── Float / decimal literal ──────────────────────────────────────
+        // ── float / decimal literal ──────────────────────────────────────
         TokenType.DecimalValue => {
             const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
             n.node_type = ASTNodeType.FloatLiteral;
@@ -55,7 +53,7 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             return n;
         },
 
-        // ── Boolean literals ─────────────────────────────────────────────
+        // ── true / false ─────────────────────────────────────────────────
         TokenType.True, TokenType.False => {
             const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
             n.node_type = ASTNodeType.BoolLiteral;
@@ -64,7 +62,7 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             return n;
         },
 
-        // ── Char literal ─────────────────────────────────────────────────
+        // ── char literal ─────────────────────────────────────────────────
         TokenType.CharValue => {
             const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
             n.node_type = ASTNodeType.CharLiteral;
@@ -73,7 +71,7 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             return n;
         },
 
-        // ── String literal ───────────────────────────────────────────────
+        // ── string literal ───────────────────────────────────────────────
         TokenType.StringValue => {
             const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
             n.node_type = ASTNodeType.StringLiteral;
@@ -82,10 +80,10 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             return n;
         },
 
-        // ── Identifier or function call: name  /  name(args…) ────────────
+        // ── identifier or function call: name  /  name(args…) ────────────
         TokenType.Identifier => {
             ast_data.advance();
-            // Peek: is the next token '(' ?  -> function call
+            // peek ahead — if there's a '(' right after, it's a function call
             const next = ast_data.peekToken(0);
             if (next != null and next.?.token_type == TokenType.LeftParen) {
                 return try parseFunctionCallNode(allocator, ast_data, tok);
@@ -96,7 +94,7 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             return n;
         },
 
-        // ── Unary minus: -expr ───────────────────────────────────────────
+        // ── unary minus: -expr ───────────────────────────────────────────
         TokenType.Minus => {
             ast_data.advance();
             const operand = try parsePrimary(allocator, ast_data);
@@ -111,7 +109,7 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             return n;
         },
 
-        // ── Logical not: !expr ───────────────────────────────────────────
+        // ── logical not: !expr ───────────────────────────────────────────
         TokenType.ExclamationMark => {
             ast_data.advance();
             const operand = try parsePrimary(allocator, ast_data);
@@ -126,11 +124,11 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             return n;
         },
 
-        // ── Grouped expression: ( expr ) ─────────────────────────────────
+        // ── grouped expression: ( expr ) ─────────────────────────────────
         TokenType.LeftParen => {
-            ast_data.advance(); // consume '('
+            ast_data.advance(); // eat the '('
             const inner = try parseBinaryExpr(allocator, ast_data, 0);
-            // expect ')'
+            // close it up if there's a matching ')'
             if (ast_data.hasMore()) {
                 const close: Token = try ast_data.getToken();
                 if (close.token_type == TokenType.RightParen) {
@@ -140,16 +138,16 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             return inner;
         },
 
+        // anything else isn't an expression — return null and let the caller decide
         else => return null,
     }
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Precedence-climbing binary expression parser
-// ─────────────────────────────────────────────────────────────────────────────
+// ── precedence-climbing binary expression parser ──────────────────────────────
 
-/// Parse a binary expression with minimum precedence `min_prec`.
-/// Implements the precedence-climbing algorithm (same as Video 2 tutorial).
+// The main expression parser. min_prec controls which operators we're
+// willing to consume at this level — higher levels grab tighter-binding ops.
+// This is the standard precedence-climbing algorithm, nothing fancy.
 pub fn parseBinaryExpr(
     allocator: *Allocator,
     ast_data: *ASTData,
@@ -164,14 +162,15 @@ pub fn parseBinaryExpr(
 
         const op_tok: Token = ast_data.token_list.items[ast_data.token_index];
 
+        // stop if this isn't an operator we care about
         if (!tok_utils.isBinaryOperator(op_tok.token_type)) break;
 
         const prec = tok_utils.getPrecedence(op_tok.token_type);
         if (prec < min_prec) break;
 
-        ast_data.advance(); // consume operator
+        ast_data.advance(); // eat the operator
 
-        // right-associative: parse with prec+1; for left-assoc: prec+1
+        // recurse with prec+1 so left-associative operators work correctly
         const right: ?*ASTNode = try parseBinaryExpr(allocator, ast_data, prec + 1);
 
         if (right == null) {
@@ -192,12 +191,10 @@ pub fn parseBinaryExpr(
     return left;
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Function call argument parser
-// ─────────────────────────────────────────────────────────────────────────────
+// ── function call argument parser ─────────────────────────────────────────────
 
-/// Parse a function call node given the already-consumed name token.
-/// Expects the current token to be '('.
+// Parses a function call given the name token we already consumed.
+// When we get here the current token should be '('.
 fn parseFunctionCallNode(
     allocator: *Allocator,
     ast_data: *ASTData,
@@ -208,7 +205,7 @@ fn parseFunctionCallNode(
     call.token = name_tok;
     call.children = try ast_utils.createChildList(allocator);
 
-    ast_data.advance(); // consume '('
+    ast_data.advance(); // eat '('
 
     var loop_guard: usize = 0;
     while (ast_data.hasMore()) {
@@ -217,11 +214,11 @@ fn parseFunctionCallNode(
 
         const cur: Token = try ast_data.getToken();
         if (cur.token_type == TokenType.RightParen) {
-            ast_data.advance(); // consume ')'
+            ast_data.advance(); // eat ')'
             break;
         }
 
-        // Parse argument expression
+        // parse the argument expression
         const arg_expr = try parseBinaryExpr(allocator, ast_data, 0);
         if (arg_expr == null) break;
 
@@ -231,7 +228,7 @@ fn parseFunctionCallNode(
 
         call.children.?.*.append(allocator.*, arg_node) catch return AstError.Out_Of_Memory;
 
-        // Optional comma between arguments
+        // comma between arguments is optional
         if (ast_data.hasMore()) {
             const sep: Token = try ast_data.getToken();
             if (sep.token_type == TokenType.Comma) {
