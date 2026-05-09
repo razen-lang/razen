@@ -42,4 +42,5 @@ zig build run
 ```
 
 **LICENSE:** Apache 2.0 License
+
 **Creator:** [Prathmesh Barot](https://github.com/prathmesh-barot)
