@@ -32,32 +32,32 @@ pub const TokenType = enum {
     Float, // float = f32
     Bool, // bool
     Char, // char
-    Void, // void
-    Noret, // noret : noret means no return, which is used for functions that do not return a value. Void is used for functions that return nothing, but noret is more concise and easier to type
-    Any, // any : any means any type, which is used for variables that can hold any type of value. It is similar to void*, but it is more concise and easier to type
-    Str, // str : stakced string
-    String, // string : heap string
+    Void, // void (returns nothing)
+    Noret, // noret (short for no return, like diverging functions)
+    Any, // any (can hold any type of value)
+    Str, // str (stacked string slice)
+    String, // string (heap allocated string)
     /// Keywords
     Type, // type
     Enum, // enum
     Union, // union
     Error, // error
     Struct, // struct
-    Behave, // behave
-    Ext, // ext : extern means external, but ext is more concise and easier to type
+    Behave, // behave (used for traits/interfaces)
+    Ext, // ext (short for extern)
     Func, // func
-    Pub, // pub
-    Mod, // mod
-    Use, // use
-    Const, // const
-    Mut, // mut
+    Pub, // pub (public visibility marker)
+    Mod, // mod (module declaration)
+    Use, // use (importing a module)
+    Const, // const (immutable bindings)
+    Mut, // mut (mutable bindings)
     If, // if
     Else, // else
-    Match, // match
-    Loop, // loop
-    Ret, // ret : return is a reserved keyword in many languages, but ret is more concise and easier to type
+    Match, // match (pattern matching)
+    Loop, // loop (infinite or targeted loops)
+    Ret, // ret (shorthand for return)
     Break, // break
-    Skip, // skip : continue is a reserved keyword in many languages, but skip is more concise and easier to type
+    Skip, // skip (shorthand for continue)
     Try, // try
     Catch, // catch
     Defer, // defer
