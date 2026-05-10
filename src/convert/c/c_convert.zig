@@ -18,6 +18,14 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const StringBuilder = convert_data.StringBuilder;
 
+fn dotToUnderscore(allocator: *Allocator, s: []const u8) ConvertError![]u8 {
+    const result = allocator.*.dupe(u8, s) catch return ConvertError.Out_Of_Memory;
+    for (result) |*c| {
+        if (c.* == '.') c.* = '_';
+    }
+    return result;
+}
+
 pub fn convert(allocator: *Allocator, ast_nodes: *ArrayList(*ASTNode), source: []const u8) ConvertError![]u8 {
     _ = source;
     print("\t{s}Converting AST to C{s}\t\t\t", .{ lexer.GREY, lexer.RESET });
@@ -91,10 +99,10 @@ fn processGlobalNode(allocator: *Allocator, data: *ConvertData) ConvertError!voi
             try data.appendCodeFmt(allocator, "// Module {s}\n", .{node.?.token.?.value});
         },
         ASTNodeType.UseDeclaration => {
-            // use std.io -> #include <std.io.h>
-            // In a real compiler we'd resolve headers, here we just emit what it says
+            // C5 FIX: use std.io -> #include "std_io.h" (dots become underscores)
             const path = node.?.token.?.value;
-            try data.appendCodeFmt(allocator, "#include \"{s}.h\"\n", .{path});
+            const c_path = try dotToUnderscore(allocator, path);
+            try data.appendCodeFmt(allocator, "#include \"{s}.h\"\n", .{c_path});
         },
         ASTNodeType.TypeAliasDeclaration => {
             // type Flags = u32

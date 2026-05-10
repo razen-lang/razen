@@ -35,11 +35,11 @@ pub fn convertToCType(tt: TokenType) ?[]const u8 {
     }
 }
 
-// Converts a complex AST type node to a C string (allocates on the arena)
-pub fn nodeToCType(allocator: *Allocator, node: *ASTNode) ![]const u8 {
+/// Converts an AST type node to a C type string.
+/// current_struct: pass the enclosing struct name so @Self resolves correctly; null otherwise.
+pub fn nodeToCTypeWithSelf(allocator: *Allocator, node: *ASTNode, current_struct: ?[]const u8) anyerror![]const u8 {
     if (node.node_type == ASTNodeType.ArrayType) {
-        // [T] -> T*
-        const inner = try nodeToCType(allocator, node.left.?);
+        const inner = try nodeToCTypeWithSelf(allocator, node.left.?, current_struct);
         return try std.fmt.allocPrint(allocator.*, "{s}*", .{inner});
     }
 
@@ -48,33 +48,36 @@ pub fn nodeToCType(allocator: *Allocator, node: *ASTNode) ![]const u8 {
 
         // primitive type
         if (convertToCType(tok.token_type)) |prim| {
-            // handle pointers *T -> prim*
             if (node.left != null) {
-                const inner = try nodeToCType(allocator, node.left.?);
+                const inner = try nodeToCTypeWithSelf(allocator, node.left.?, current_struct);
                 if (tok.token_type == TokenType.Star) {
                     return try std.fmt.allocPrint(allocator.*, "{s}*", .{inner});
                 }
-                // for now handle !T or ?T as just T
                 return inner;
             }
             return prim;
         }
 
-        // identifier type like State, NetErr
+        // C4 FIX: @Self → resolve to current struct/behave name.
+        // The parser eats '@' and stores the name token directly as Identifier "Self".
+        // MUST be checked before the generic Identifier fallback below.
+        if (tok.token_type == TokenType.Identifier and std.mem.eql(u8, tok.value, "Self")) {
+            if (current_struct) |name| return name;
+            return "void*"; // @Self used outside struct context — safe fallback
+        }
+
+        if (tok.token_type == TokenType.At) {
+            return "void*"; // bare @ without name
+        }
+
+        // identifier type like State, NetErr, user-defined names
         if (tok.token_type == TokenType.Identifier) {
             return tok.value;
         }
 
-        // @Self etc.
-        if (tok.token_type == TokenType.At) {
-            // Self* in C would just be `void*` for now or the struct type if we know it.
-            // We'll output `void*` or the value for simplicity.
-            return "void*";
-        }
-
-        // user-defined struct/enum pointer: *State
+        // pointer to user type: *State
         if (tok.token_type == TokenType.Star and node.left != null) {
-            const inner = try nodeToCType(allocator, node.left.?);
+            const inner = try nodeToCTypeWithSelf(allocator, node.left.?, current_struct);
             return try std.fmt.allocPrint(allocator.*, "{s}*", .{inner});
         }
 
@@ -82,4 +85,9 @@ pub fn nodeToCType(allocator: *Allocator, node: *ASTNode) ![]const u8 {
     }
 
     return "void";
+}
+
+/// Convenience wrapper with no struct context (most callers use this).
+pub fn nodeToCType(allocator: *Allocator, node: *ASTNode) anyerror![]const u8 {
+    return nodeToCTypeWithSelf(allocator, node, null);
 }
