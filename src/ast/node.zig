@@ -25,17 +25,17 @@ pub const ASTNodeType = enum {
     Parameters, // the whole list of parameters
 
     // ── type nodes ────────────────────────────────────────────────────────
-    VarType,    // holds the actual type keyword or identifier
+    VarType, // holds the actual type keyword or identifier
     ReturnType,
 
     // ── expressions ───────────────────────────────────────────────────────
-    BinaryExpression,  // a + b, a == b, that kind of thing
-    UnaryExpression,   // -x, !x
-    Identifier,        // a name that refers to something
+    BinaryExpression, // a + b, a == b, that kind of thing
+    UnaryExpression, // -x, !x
+    Identifier, // a name that refers to something
 
     // ── statements ────────────────────────────────────────────────────────
     ReturnStatement, // ret expr
-    Assignment,      // name = expr  or  name += expr
+    Assignment, // name = expr  or  name += expr
 
     // ── block / body ──────────────────────────────────────────────────────
     Block, // { stmts… }
@@ -49,7 +49,7 @@ pub const ASTNodeType = enum {
 
     // ── function calls ────────────────────────────────────────────────────
     FunctionCall, // name(args…)
-    Argument,     // one argument inside a call
+    Argument, // one argument inside a call
 
     // ── comments ──────────────────────────────────────────────────────────
     Comment,

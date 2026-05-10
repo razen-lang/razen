@@ -8,7 +8,7 @@ const twoSlicesAreTheSame = lexer.twoSlicesAreTheSame;
 // if nothing matches, it falls through to number detection and then defaults to Identifier
 pub fn getTokenType(source: []const u8) TokenType {
 
-    // ── built-in types ────────────────────────────────────────────────────
+    // built-in types
     if (twoSlicesAreTheSame(source, token.I1)) return TokenType.I1;
     if (twoSlicesAreTheSame(source, token.I2)) return TokenType.I2;
     if (twoSlicesAreTheSame(source, token.I4)) return TokenType.I4;
@@ -42,7 +42,7 @@ pub fn getTokenType(source: []const u8) TokenType {
     if (twoSlicesAreTheSame(source, token.STR)) return TokenType.Str;
     if (twoSlicesAreTheSame(source, token.STRING)) return TokenType.String;
 
-    // ── keywords ──────────────────────────────────────────────────────────
+    //keywords
     if (twoSlicesAreTheSame(source, token.TYPE)) return TokenType.Type;
     if (twoSlicesAreTheSame(source, token.ENUM)) return TokenType.Enum;
     if (twoSlicesAreTheSame(source, token.UNION)) return TokenType.Union;
@@ -70,7 +70,7 @@ pub fn getTokenType(source: []const u8) TokenType {
     if (twoSlicesAreTheSame(source, token.TRUE)) return TokenType.True;
     if (twoSlicesAreTheSame(source, token.FALSE)) return TokenType.False;
 
-    // ── operators ─────────────────────────────────────────────────────────
+    // operators
     if (twoSlicesAreTheSame(source, token.EQUALS)) return TokenType.Equals;
     if (twoSlicesAreTheSame(source, token.COLON_EQUALS)) return TokenType.ColonEquals;
     if (twoSlicesAreTheSame(source, token.PLUS_EQUALS)) return TokenType.PlusEquals;
@@ -117,12 +117,12 @@ pub fn getTokenType(source: []const u8) TokenType {
     if (twoSlicesAreTheSame(source, token.DOT_DOT_EQUALS)) return TokenType.DotDotEquals;
     if (twoSlicesAreTheSame(source, token.AT)) return TokenType.At;
 
-    // ── number literals ───────────────────────────────────────────────────
+    // number literals
     if (isInteger(source)) return TokenType.IntegerValue;
     if (isDecimal(source)) return TokenType.DecimalValue;
 
-    // ── string / char value (already surrounded by quotes at this point) ──
-    if (lexer.contains(source, '"'))  return TokenType.StringValue;
+    // string / char value (already surrounded by quotes at this point)
+    if (lexer.contains(source, '"')) return TokenType.StringValue;
     if (lexer.contains(source, '\'')) return TokenType.CharValue;
 
     // nothing else matched, must be a user-defined name

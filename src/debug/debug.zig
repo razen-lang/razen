@@ -36,10 +36,12 @@ pub fn printTokens(token_list: *ArrayList(Token)) void {
         print(
             "  {s}[{d:>3}]{s}  {s}Type:{s} {s}{s}{s}  {s}Value:{s} {s}'{s}'{s}  {s}Line:{s} {d}\n",
             .{
-                GREY,  i,                           RST,
-                GREY,  RST, CREAM, @tagName(tok.token_type), RST,
-                GREY,  RST, ORANGE, tok.value,      RST,
-                GREY,  RST, tok.line,
+                GREY,                     i,      RST,
+                GREY,                     RST,    CREAM,
+                @tagName(tok.token_type), RST,    GREY,
+                RST,                      ORANGE, tok.value,
+                RST,                      GREY,   RST,
+                tok.line,
             },
         );
     }
@@ -79,17 +81,23 @@ pub fn printNode(n: *const ASTNode, depth: usize) void {
     }
 
     // flags on the same line, shown in muted grey
-    if (n.is_pub)    print("  {s}pub{s}",    .{ GREY, RST });
-    if (n.is_const)  print("  {s}const{s}",  .{ GREY, RST });
-    if (n.is_mut)    print("  {s}mut{s}",    .{ GREY, RST });
+    if (n.is_pub) print("  {s}pub{s}", .{ GREY, RST });
+    if (n.is_const) print("  {s}const{s}", .{ GREY, RST });
+    if (n.is_mut) print("  {s}mut{s}", .{ GREY, RST });
     if (n.is_global) print("  {s}global{s}", .{ GREY, RST });
 
     print("\n", .{});
 
     // print children
-    if (n.left)   |l| { printChild(depth, "left",  l); }
-    if (n.middle) |m| { printChild(depth, "mid",   m); }
-    if (n.right)  |r| { printChild(depth, "right", r); }
+    if (n.left) |l| {
+        printChild(depth, "left", l);
+    }
+    if (n.middle) |m| {
+        printChild(depth, "mid", m);
+    }
+    if (n.right) |r| {
+        printChild(depth, "right", r);
+    }
 
     if (n.children) |list| {
         for (list.*.items) |child| {
@@ -110,21 +118,18 @@ fn printChild(depth: usize, label: []const u8, child: *const ASTNode) void {
 // pick a colour based on the node category so the tree is easier to read at a glance
 fn nodeColour(nt: ASTNodeType) []const u8 {
     return switch (nt) {
-        .FunctionDeclaration              => LGREEN,
+        .FunctionDeclaration => LGREEN,
         .VarDeclaration, .ConstDeclaration => GREEN,
-        .ReturnStatement                  => CYAN,
-        .IfStatement, .LoopStatement      => MAGENTA,
+        .ReturnStatement => CYAN,
+        .IfStatement, .LoopStatement => MAGENTA,
         .BinaryExpression, .UnaryExpression => YELLOW,
-        .IntegerLiteral, .FloatLiteral,
-        .BoolLiteral, .CharLiteral,
-        .StringLiteral                    => ORANGE,
-        .Identifier                       => PEACH,
-        .FunctionCall                     => BLUE,
-        .Parameter, .Parameters           => CREAM,
-        .Assignment                       => YELLOW,
-        .Block, .IfBody, .ElseBody,
-        .LoopBody                         => GREY,
-        .VarType, .ReturnType             => GREY,
-        else                              => RST,
+        .IntegerLiteral, .FloatLiteral, .BoolLiteral, .CharLiteral, .StringLiteral => ORANGE,
+        .Identifier => PEACH,
+        .FunctionCall => BLUE,
+        .Parameter, .Parameters => CREAM,
+        .Assignment => YELLOW,
+        .Block, .IfBody, .ElseBody, .LoopBody => GREY,
+        .VarType, .ReturnType => GREY,
+        else => RST,
     };
 }

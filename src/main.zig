@@ -5,6 +5,7 @@ const lexer = @import("lexer/lexer.zig");
 const token = @import("lexer/token.zig");
 const debugging = @import("debug/debug.zig");
 const ast_builder = @import("ast/ast_builder.zig");
+const c_convert = @import("convert/c/c_convert.zig");
 const print = std.debug.print;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const Allocator = std.mem.Allocator;
@@ -38,12 +39,20 @@ fn convertCode(source: []const u8) void {
         print("{s}AST error: {}{s}\n", .{ lexer.RED, err, lexer.RESET });
         return;
     };
-
     debugging.printAST(ast_nodes);
+
+    // ── Phase 3: convert AST to C code ────────────────────────
+    print("{s}Phase 3{s}  ", .{ lexer.CREAM, lexer.RESET });
+    const c_code = c_convert.convert(&arena_allocator, ast_nodes, source) catch |err| {
+        print("{s}Convert error: {}{s}\n", .{ lexer.RED, err, lexer.RESET });
+        return;
+    };
+
+    print("\n{s}Generated C Code:{s}\n{s}\n", .{ lexer.CYAN, lexer.RESET, c_code });
 }
 
 pub fn main() void {
-    print("{s}Razen Lang — Phase 2{s}\n", .{ lexer.LIGHT_GREEN, lexer.RESET });
+    print("{s}Razen Lang — Phase 3{s}\n", .{ lexer.LIGHT_GREEN, lexer.RESET });
 
     print("\n{s}▶ Sample: RETURN_ZERO{s}\n", .{ lexer.CYAN, lexer.RESET });
     convertCode(code_samples.RETURN_ZERO);
