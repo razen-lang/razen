@@ -94,8 +94,7 @@ pub fn printExpression(allocator: *Allocator, data: *ConvertData, node: *ASTNode
                                 }
                             }
                         }
-                        return std.fmt.allocPrint(allocator.*, "({s}){{ .tag = {s}, .data = {{ .{s} = {s} }} }}",
-                            .{ union_name, tag, variant_name, payload_str.items }) catch return ConvertError.Out_Of_Memory;
+                        return std.fmt.allocPrint(allocator.*, "({s}){{ .tag = {s}, .data = {{ .{s} = {s} }} }}", .{ union_name, tag, variant_name, payload_str.items }) catch return ConvertError.Out_Of_Memory;
                     }
                 }
                 // not a known union constructor — fall through to namespace call
@@ -199,13 +198,13 @@ pub fn printExpression(allocator: *Allocator, data: *ConvertData, node: *ASTNode
                 return "sizeof(void)";
             }
             // F12: allocator builtins — map to razen_core.h allocator stubs
-            if (std.mem.eql(u8, bname, "c"))     return "razen_c_allocator()";
-            if (std.mem.eql(u8, bname, "page"))  return "razen_page_allocator()";
+            if (std.mem.eql(u8, bname, "c")) return "razen_c_allocator()";
+            if (std.mem.eql(u8, bname, "page")) return "razen_page_allocator()";
             if (std.mem.eql(u8, bname, "arena")) return "razen_arena_allocator()";
-            if (std.mem.eql(u8, bname, "pool"))  return "razen_pool_allocator()";
+            if (std.mem.eql(u8, bname, "pool")) return "razen_pool_allocator()";
             if (std.mem.eql(u8, bname, "stack")) return "razen_stack_allocator()";
             if (std.mem.eql(u8, bname, "fixed")) return "razen_fixed_allocator()";
-            if (std.mem.eql(u8, bname, "gpa"))   return "razen_gpa_allocator()";
+            if (std.mem.eql(u8, bname, "gpa")) return "razen_gpa_allocator()";
             if (std.mem.eql(u8, bname, "debug")) return "razen_debug_allocator()";
             return std.fmt.allocPrint(allocator.*, "razen_{s}()", .{bname}) catch return ConvertError.Out_Of_Memory;
         },
