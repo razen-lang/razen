@@ -66,7 +66,9 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
             if (add_tabs) try data.addTab(allocator);
             try data.appendCode(allocator, "while (1) {\n");
             data.incrementIndexCount();
-            if (node.left != null) {
+            if (node.right != null) {
+                try processBody(allocator, data, node.right.?);
+            } else if (node.left != null and node.left.?.node_type == ASTNodeType.LoopBody) {
                 try processBody(allocator, data, node.left.?);
             }
             data.decrementIndexCount();

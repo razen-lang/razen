@@ -69,6 +69,7 @@ pub fn getTokenType(source: []const u8) TokenType {
     if (twoSlicesAreTheSame(source, token.TEST)) return TokenType.Test;
     if (twoSlicesAreTheSame(source, token.TRUE)) return TokenType.True;
     if (twoSlicesAreTheSame(source, token.FALSE)) return TokenType.False;
+    if (twoSlicesAreTheSame(source, token.ASYNC)) return TokenType.Async;
 
     // operators
     if (twoSlicesAreTheSame(source, token.EQUALS)) return TokenType.Equals;

@@ -12,12 +12,39 @@ pub const ASTNodeType = enum {
     StringLiteral,
     CharLiteral,
     BoolLiteral,
+    ArrayLiteral,
+    ArrayType,
 
     // ── declarations ──────────────────────────────────────────────────────
     // name : type = expr;   or  name := expr;  or  mut name : type = expr;
     VarDeclaration,
     // const NAME : type = expr;
     ConstDeclaration,
+    // type Name = type;
+    TypeAliasDeclaration,
+    // enum Name { ... }
+    EnumDeclaration,
+    EnumField,
+    // struct Name { ... }
+    StructDeclaration,
+    StructField,
+    // union Name { ... }
+    UnionDeclaration,
+    UnionField,
+    // error Name { ... }
+    ErrorDeclaration,
+    ErrorField,
+    // mod module;
+    ModuleDeclaration,
+    // use mod;
+    UseDeclaration,
+    // behave Trait { ... }
+    BehaveDeclaration,
+    // ext func ...
+    ExtDeclaration,
+    // @Annotation
+    Annotation,
+    
     // func name(params) -> ret_type { body }
     FunctionDeclaration,
     // a single function parameter  name: type
@@ -31,6 +58,7 @@ pub const ASTNodeType = enum {
     // ── expressions ───────────────────────────────────────────────────────
     BinaryExpression, // a + b, a == b, that kind of thing
     UnaryExpression, // -x, !x
+    MemberAccess, // a.b — dot member access
     Identifier, // a name that refers to something
 
     // ── statements ────────────────────────────────────────────────────────
@@ -46,6 +74,12 @@ pub const ASTNodeType = enum {
     ElseBody,
     LoopStatement, // loop { … }
     LoopBody,
+    MatchStatement, // match expr { ... }
+    MatchCase,
+    MatchBody,
+    TryExpression, // try expr
+    CatchExpression, // expr catch backup
+    DeferStatement, // defer stmt
 
     // ── function calls ────────────────────────────────────────────────────
     FunctionCall, // name(args…)
@@ -77,4 +111,5 @@ pub const ASTNode = struct {
     is_mut: bool = false,
     is_global: bool = false,
     is_pub: bool = false,
+    is_async: bool = false,
 };

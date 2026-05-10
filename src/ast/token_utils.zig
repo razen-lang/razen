@@ -104,6 +104,40 @@ pub fn isLiteral(tt: TokenType) bool {
     };
 }
 
+pub fn isKeyword(tt: TokenType) bool {
+    return switch (tt) {
+        TokenType.Type,
+        TokenType.Enum,
+        TokenType.Union,
+        TokenType.Error,
+        TokenType.Struct,
+        TokenType.Behave,
+        TokenType.Ext,
+        TokenType.Func,
+        TokenType.Pub,
+        TokenType.Mod,
+        TokenType.Use,
+        TokenType.Const,
+        TokenType.Mut,
+        TokenType.If,
+        TokenType.Else,
+        TokenType.Match,
+        TokenType.Loop,
+        TokenType.Ret,
+        TokenType.Break,
+        TokenType.Skip,
+        TokenType.Try,
+        TokenType.Catch,
+        TokenType.Defer,
+        TokenType.Test,
+        TokenType.True,
+        TokenType.False,
+        TokenType.Async,
+        => true,
+        else => false,
+    };
+}
+
 // ── operator helpers ──────────────────────────────────────────────────────────
 
 // true for anything that can sit between two expressions as a binary operator
@@ -127,6 +161,8 @@ pub fn isBinaryOperator(tt: TokenType) bool {
         TokenType.Caret,
         TokenType.ShiftLeft,
         TokenType.ShiftRight,
+        TokenType.Catch,
+        TokenType.Dot, // member access  a.b
         => true,
         else => false,
     };
@@ -162,16 +198,18 @@ pub fn isAssignmentOperator(tt: TokenType) bool {
 //
 pub fn getPrecedence(tt: TokenType) usize {
     return switch (tt) {
-        TokenType.OrOr => 1,
-        TokenType.AndAnd => 2,
-        TokenType.EqualsEquals, TokenType.NotEquals => 3,
-        TokenType.LessThan, TokenType.LessThanEquals, TokenType.GreaterThan, TokenType.GreaterThanEquals => 4,
-        TokenType.Or => 5,
-        TokenType.Caret => 5,
-        TokenType.And => 6,
-        TokenType.ShiftLeft, TokenType.ShiftRight => 7,
-        TokenType.Plus, TokenType.Minus => 8,
-        TokenType.Star, TokenType.Slash, TokenType.Percent => 9,
+        TokenType.Catch  => 1,
+        TokenType.OrOr   => 2,
+        TokenType.AndAnd => 3,
+        TokenType.EqualsEquals, TokenType.NotEquals => 4,
+        TokenType.LessThan, TokenType.LessThanEquals, TokenType.GreaterThan, TokenType.GreaterThanEquals => 5,
+        TokenType.Or     => 6,
+        TokenType.Caret  => 6,
+        TokenType.And    => 7,
+        TokenType.ShiftLeft, TokenType.ShiftRight => 8,
+        TokenType.Plus, TokenType.Minus => 9,
+        TokenType.Star, TokenType.Slash, TokenType.Percent => 10,
+        TokenType.Dot   => 12, // member access binds tightest of all binary ops
         else => 0,
     };
 }

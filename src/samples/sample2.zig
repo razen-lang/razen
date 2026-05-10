@@ -65,3 +65,51 @@ pub const IF_ELSE =
     \\    }
     \\}
 ;
+
+pub const PHASE_2_EXHAUSTIVE =
+    \\mod Network
+    \\use std.io
+    \\
+    \\type Flags = u32
+    \\
+    \\behave SerDe {
+    \\    needs tag: u8
+    \\    func serialize(x: @Self) -> [u8]
+    \\}
+    \\
+    \\struct Packet ~> SerDe {
+    \\    tag: u8,
+    \\    data: [u8],
+    \\}
+    \\
+    \\enum State {
+    \\    Open,
+    \\    Closed,
+    \\}
+    \\
+    \\union NetErr {
+    \\    Code: i32,
+    \\    Msg: str,
+    \\}
+    \\
+    \\error SystemError { ConnReset, Timeout }
+    \\
+    \\ext func bind(port: int) -> int
+    \\
+    \\pub func handle_conn() -> void {
+    \\    defer std.io.print("Closed!")
+    \\    
+    \\    s := State.Open
+    \\    match s {
+    \\        State.Open => std.io.print("open"),
+    \\        State.Closed => std.io.print("closed")
+    \\    }
+    \\
+    \\    items := [1, 2, 3]
+    \\    loop items |i| {
+    \\        std.io.print(i)
+    \\    }
+    \\
+    \\    res := try bind(8080) catch |e| { ret }
+    \\}
+;

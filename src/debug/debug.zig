@@ -119,17 +119,17 @@ fn printChild(depth: usize, label: []const u8, child: *const ASTNode) void {
 fn nodeColour(nt: ASTNodeType) []const u8 {
     return switch (nt) {
         .FunctionDeclaration => LGREEN,
-        .VarDeclaration, .ConstDeclaration => GREEN,
+        .VarDeclaration, .ConstDeclaration, .TypeAliasDeclaration, .EnumDeclaration, .StructDeclaration, .UnionDeclaration, .ErrorDeclaration, .BehaveDeclaration, .ExtDeclaration, .ModuleDeclaration, .UseDeclaration => GREEN,
         .ReturnStatement => CYAN,
-        .IfStatement, .LoopStatement => MAGENTA,
-        .BinaryExpression, .UnaryExpression => YELLOW,
-        .IntegerLiteral, .FloatLiteral, .BoolLiteral, .CharLiteral, .StringLiteral => ORANGE,
-        .Identifier => PEACH,
+        .IfStatement, .LoopStatement, .MatchStatement, .DeferStatement => MAGENTA,
+        .BinaryExpression, .UnaryExpression, .TryExpression, .CatchExpression => YELLOW,
+        .IntegerLiteral, .FloatLiteral, .BoolLiteral, .CharLiteral, .StringLiteral, .ArrayLiteral => ORANGE,
+        .Identifier, .EnumField, .StructField, .UnionField, .ErrorField => PEACH,
         .FunctionCall => BLUE,
         .Parameter, .Parameters => CREAM,
         .Assignment => YELLOW,
-        .Block, .IfBody, .ElseBody, .LoopBody => GREY,
-        .VarType, .ReturnType => GREY,
+        .Block, .IfBody, .ElseBody, .LoopBody, .MatchBody, .MatchCase => GREY,
+        .VarType, .ReturnType, .ArrayType => GREY,
         else => RST,
     };
 }

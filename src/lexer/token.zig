@@ -68,6 +68,7 @@ pub const TokenType = enum {
     Test, // test
     True, // true
     False, // false
+    Async, // async — marks a function as asynchronous
 
     // ── operators and separators ──────────────────────────────────────────
     Comment, // start of a comment
@@ -189,6 +190,7 @@ pub const DEFER = "defer";
 pub const TEST = "test";
 pub const TRUE = "true";
 pub const FALSE = "false";
+pub const ASYNC = "async";
 
 // ── operator strings ──────────────────────────────────────────────────────────
 
