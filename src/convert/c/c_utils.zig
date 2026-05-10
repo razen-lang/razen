@@ -58,20 +58,21 @@ pub fn nodeToCTypeWithSelf(allocator: *Allocator, node: *ASTNode, current_struct
             return prim;
         }
 
-        // identifier type like State, NetErr
-        if (tok.token_type == TokenType.Identifier) {
-            return tok.value;
+        // C4 FIX: @Self → resolve to current struct/behave name.
+        // The parser eats '@' and stores the name token directly as Identifier "Self".
+        // MUST be checked before the generic Identifier fallback below.
+        if (tok.token_type == TokenType.Identifier and std.mem.eql(u8, tok.value, "Self")) {
+            if (current_struct) |name| return name;
+            return "void*"; // @Self used outside struct context — safe fallback
         }
 
-        // C4 FIX: @Self → resolve to current struct/behave name when known
         if (tok.token_type == TokenType.At) {
-            if (node.left != null and node.left.?.token != null) {
-                const self_name = node.left.?.token.?.value;
-                if (std.mem.eql(u8, self_name, "Self")) {
-                    if (current_struct) |name| return name;
-                }
-            }
-            return "void*"; // safe fallback
+            return "void*"; // bare @ without name
+        }
+
+        // identifier type like State, NetErr, user-defined names
+        if (tok.token_type == TokenType.Identifier) {
+            return tok.value;
         }
 
         // pointer to user type: *State

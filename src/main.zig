@@ -67,21 +67,24 @@ fn convertCode(label: []const u8, source: []const u8) void {
 
 pub fn main() void {
     print("{s}Razen Lang — Full Pipeline Test{s}\n", .{ lexer.LIGHT_GREEN, lexer.RESET });
+    print("{s}std API: std.fmt.print/println | std.os.exit | std.debug.assert/panic{s}\n\n", .{ lexer.GREY, lexer.RESET });
 
-    // ── Original samples ────────────────────────────────────────────────
-    convertCode("RETURN_ZERO",       code_samples.RETURN_ZERO);
-    convertCode("ARITH_EXPR",        code_samples.ARITH_EXPR);
-    convertCode("IF_ELSE",           code_samples.IF_ELSE);
-    convertCode("FULL_PROGRAM",      code_samples.FULL_PROGRAM);
-    convertCode("PHASE_2_EXHAUSTIVE",code_samples.PHASE_2_EXHAUSTIVE);
+    // ── Core samples ────────────────────────────────────────────────────
+    convertCode("RETURN_ZERO",        code_samples.RETURN_ZERO);
+    convertCode("ARITH_EXPR",         code_samples.ARITH_EXPR);
+    convertCode("IF_ELSE",            code_samples.IF_ELSE);
+    convertCode("FULL_PROGRAM",       code_samples.FULL_PROGRAM);
+    convertCode("PHASE_2_EXHAUSTIVE", code_samples.PHASE_2_EXHAUSTIVE);
 
-    // ── Critical-bug fix samples ────────────────────────────────────────
-    convertCode("C1: DEFER ORDER",              critical_samples.DEFER_ORDER);
-    convertCode("C1: DEFER BEFORE RETURN",      critical_samples.DEFER_BEFORE_RETURN);
-    convertCode("C2: TRY/CATCH BASIC",          critical_samples.TRY_CATCH_BASIC);
-    convertCode("C3: TAGGED UNION",             critical_samples.TAGGED_UNION);
+    // ── Critical-bug fix samples ─────────────────────────────────────────
+    convertCode("C1: DEFER ORDER",                 critical_samples.DEFER_ORDER);
+    convertCode("C1: DEFER BEFORE RETURN",         critical_samples.DEFER_BEFORE_RETURN);
+    convertCode("C2: TRY/CATCH",                   critical_samples.TRY_CATCH_BASIC);
+    convertCode("C3: TAGGED UNION",                critical_samples.TAGGED_UNION);
     convertCode("C3: TAGGED UNION STRUCT VARIANT", critical_samples.TAGGED_UNION_STRUCT_VARIANT);
-    convertCode("C4: @SELF IN BEHAVE",          critical_samples.SELF_IN_BEHAVE);
-    convertCode("C5: USE PATH DOTS",            critical_samples.USE_PATH);
-    convertCode("COMBINED: STRUCT+MATCH+DEFER", critical_samples.STRUCT_MATCH_DEFER);
+    convertCode("C4: @SELF IN BEHAVE",             critical_samples.SELF_IN_BEHAVE);
+    convertCode("C5: USE PATH DOTS",               critical_samples.USE_PATH);
+    convertCode("STD.DEBUG ASSERT+PANIC",          critical_samples.DEBUG_ASSERT);
+    convertCode("STD.OS EXIT+CLOCK",               critical_samples.OS_SAMPLE);
+    convertCode("STRUCT+MATCH+DEFER",              critical_samples.STRUCT_MATCH_DEFER);
 }

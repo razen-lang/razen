@@ -1,15 +1,43 @@
-// sample code strings used to test the parser and AST builder
-// covers most of what Phase 2 can handle:
-//   - const declarations
-//   - mutable variables with explicit and inferred types
-//   - function declarations with params and return types
-//   - arithmetic, comparison, and logical expressions
-//   - if / else blocks
-//   - loops and break
-//   - return statements
-//   - assignment and compound assignment
-//   - function calls
+// sample2.zig — core pipeline samples
+// Uses correct std API per std_new.md:
+//   - std.fmt.print(s: str) -> void
+//   - std.fmt.println(s: str) -> void
+//   - std.fmt.eprint(s: str) -> void
+//   - std.os.exit(code: i32) -> noret
+//   - std.debug.assert(cond: bool) -> void
+//   - std.debug.panic(msg: str) -> noret
+
+// simplest possible program — just returns zero
+pub const RETURN_ZERO =
+    \\func main() -> i32 {
+    \\    ret 0
+    \\}
+;
+
+// arithmetic expressions
+pub const ARITH_EXPR =
+    \\func compute() -> i32 {
+    \\    a : i32 = 3 + 4 * 2
+    \\    b := a - 1
+    \\    ret a + b
+    \\}
+;
+
+// basic if/else
+pub const IF_ELSE =
+    \\func check(n: i32) -> bool {
+    \\    if n > 0 {
+    \\        ret true
+    \\    } else {
+    \\        ret false
+    \\    }
+    \\}
+;
+
+// full program using std.fmt (correct std module)
 pub const FULL_PROGRAM =
+    \\use std.fmt
+    \\
     \\const MAX : i32 = 100
     \\
     \\func add(a: i32, b: i32) -> i32 {
@@ -36,39 +64,15 @@ pub const FULL_PROGRAM =
     \\        }
     \\        counter += 1
     \\    }
+    \\    std.fmt.println("done")
     \\}
 ;
 
-// the simplest possible program — just returns zero
-pub const RETURN_ZERO =
-    \\func main() -> i32 {
-    \\    ret 0
-    \\}
-;
-
-// a couple of arithmetic expressions to make sure precedence is working right
-pub const ARITH_EXPR =
-    \\func compute() -> i32 {
-    \\    a : i32 = 3 + 4 * 2
-    \\    b := a - 1
-    \\    ret a + b
-    \\}
-;
-
-// basic if/else to test the branch parsing
-pub const IF_ELSE =
-    \\func check(n: i32) -> bool {
-    \\    if n > 0 {
-    \\        ret true
-    \\    } else {
-    \\        ret false
-    \\    }
-    \\}
-;
-
+// exhaustive Phase 2 test — updated to use correct std modules
 pub const PHASE_2_EXHAUSTIVE =
     \\mod Network
-    \\use std.io
+    \\use std.fmt
+    \\use std.os
     \\
     \\type Flags = u32
     \\
@@ -97,19 +101,24 @@ pub const PHASE_2_EXHAUSTIVE =
     \\ext func bind(port: int) -> int
     \\
     \\pub func handle_conn() -> void {
-    \\    defer std.io.print("Closed!")
-    \\    
+    \\    defer std.fmt.println("Closed!")
+    \\
     \\    s := State.Open
     \\    match s {
-    \\        State.Open => std.io.print("open"),
-    \\        State.Closed => std.io.print("closed")
+    \\        State.Open   => std.fmt.println("open"),
+    \\        State.Closed => std.fmt.println("closed")
     \\    }
     \\
     \\    items := [1, 2, 3]
     \\    loop items |i| {
-    \\        std.io.print(i)
+    \\        std.fmt.print(i)
     \\    }
     \\
     \\    res := try bind(8080) catch |e| { ret }
+    \\}
+    \\
+    \\pub func main() -> void {
+    \\    handle_conn()
+    \\    std.os.exit(0)
     \\}
 ;

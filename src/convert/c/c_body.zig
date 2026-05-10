@@ -186,49 +186,82 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
 ///   ErrorUnionI32 _tmp0 = call(...);
 ///   if (_tmp0.error != RAZEN_OK) { <catch body> }
 ///   const i32 var = _tmp0.value;
+/// C2 FIX: expand `var := try call() catch |e| { ... }` into proper C error-union pattern.
+///
+/// The parser produces two possible shapes:
+///
+///   Shape A (parseTryStatement via finishInferred):
+///     TryExpression
+///       .left  = BinaryExpression("catch", FunctionCall, MatchBody)
+///       .right = CatchExpression  (sometimes absent)
+///
+///   Shape B (CatchExpression present):
+///     TryExpression
+///       .left  = FunctionCall
+///       .right = CatchExpression { .left = body_block }
+///
+/// In both shapes we extract: the inner call, and the catch body block.
 fn processTryCatch(allocator: *Allocator, data: *ConvertData, decl_node: *ASTNode, add_tabs: bool) ConvertError!void {
     const var_name = decl_node.token.?.value;
     const try_node = decl_node.right.?; // TryExpression
 
-    // resolve declared type or default to i32
+    // resolve declared type — default i32
     var val_type: []const u8 = "i32";
     if (decl_node.left != null) {
         val_type = c_utils.nodeToCType(allocator, decl_node.left.?) catch "i32";
     }
 
-    // capitalise first letter for ErrorUnion<Type>
     const union_type = std.fmt.allocPrint(allocator.*, "ErrorUnion_{s}", .{val_type}) catch return ConvertError.Out_Of_Memory;
     const tmp = try data.freshTmpName(allocator);
 
+    // --- Determine inner_call_node and catch_body_node ---
+    var inner_call_node: *ASTNode = undefined;
+    var catch_body_node: ?*ASTNode = null;
+
+    if (try_node.right != null and try_node.right.?.node_type == ASTNodeType.CatchExpression) {
+        // Shape B: .left = call, .right = CatchExpression
+        inner_call_node = try_node.left.?;
+        const catch_node = try_node.right.?;
+        if (catch_node.left != null and catch_node.left.?.children != null) {
+            catch_body_node = catch_node.left.?;
+        }
+    } else if (try_node.left != null and try_node.left.?.node_type == ASTNodeType.BinaryExpression) {
+        // Shape A: .left = BinaryExpression("catch", call, body)
+        const bin = try_node.left.?;
+        inner_call_node = bin.left.?;
+        if (bin.right != null) {
+            // bin.right is MatchBody or a block — check for children
+            if (bin.right.?.children != null) {
+                catch_body_node = bin.right.?;
+            } else if (bin.right.?.left != null and bin.right.?.left.?.children != null) {
+                catch_body_node = bin.right.?.left.?;
+            }
+        }
+    } else {
+        // fallback: treat .left as the call
+        inner_call_node = try_node.left.?;
+    }
+
     // 1. emit the call into a typed ErrorUnion temp
     if (add_tabs) try data.addTab(allocator);
-    const inner_call = try c_expr.printExpression(allocator, data, try_node.left.?);
+    const inner_call = try c_expr.printExpression(allocator, data, inner_call_node);
     try data.appendCodeFmt(allocator, "{s} {s} = {s};\n", .{ union_type, tmp, inner_call });
 
-    // 2. emit the error-check block (the catch body)
+    // 2. error-check block
     if (add_tabs) try data.addTab(allocator);
     try data.appendCodeFmt(allocator, "if ({s}.error != RAZEN_OK) {{\n", .{tmp});
     data.incrementIndexCount();
-    // catch body is: TryExpression.right = BinaryExpression(catch, inner, body)
-    // body lives in try_node.right?.right (MatchBody / block)
-    if (try_node.right != null and try_node.right.?.node_type == ASTNodeType.BinaryExpression) {
-        const catch_bin = try_node.right.?;
-        if (catch_bin.right != null and catch_bin.right.?.children != null) {
-            try processBody(allocator, data, catch_bin.right.?);
-        } else {
-            // bare `ret` in catch
-            if (add_tabs) try data.addTab(allocator);
-            try data.appendCode(allocator, "return;\n");
-        }
+    if (catch_body_node) |body| {
+        try processBody(allocator, data, body);
     } else {
-        if (add_tabs) try data.addTab(allocator);
+        try data.addTab(allocator);
         try data.appendCode(allocator, "return;\n");
     }
     data.decrementIndexCount();
     if (add_tabs) try data.addTab(allocator);
     try data.appendCode(allocator, "}\n");
 
-    // 3. extract the value
+    // 3. extract the success value
     const emit_const = !decl_node.is_mut or decl_node.node_type == ASTNodeType.ConstDeclaration;
     if (add_tabs) try data.addTab(allocator);
     if (emit_const) {
@@ -236,8 +269,6 @@ fn processTryCatch(allocator: *Allocator, data: *ConvertData, decl_node: *ASTNod
     } else {
         try data.appendCodeFmt(allocator, "{s} {s} = {s}.value;\n", .{ val_type, var_name, tmp });
     }
-
-    // track variable type
     data.var_types.put(var_name, val_type) catch {};
 }
 

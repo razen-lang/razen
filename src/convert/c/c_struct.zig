@@ -33,7 +33,7 @@ pub fn processStruct(allocator: *Allocator, data: *ConvertData, node: *ASTNode) 
                     data.error_detail = "member type node is null in struct";
                     return ConvertError.Node_Is_Null;
                 }
-                const c_type_text = c_utils.nodeToCType(allocator, member_node.left.?) catch return ConvertError.Invalid_Var_Type;
+                const c_type_text = c_utils.nodeToCTypeWithSelf(allocator, member_node.left.?, data.current_struct_name) catch return ConvertError.Invalid_Var_Type;
                 try data.appendCodeFmt(allocator, "\t{s} {s};\n", .{ c_type_text, var_name });
             } else if (member_node.node_type == ASTNodeType.FunctionDeclaration) {
                 // Inline functions/methods — we ignore them in the struct layout in C,
@@ -67,7 +67,7 @@ pub fn processBehave(allocator: *Allocator, data: *ConvertData, node: *ASTNode) 
                 // e.g. needs tag: u8
                 const var_name = member_node.token.?.value;
                 if (member_node.left != null) {
-                    const c_type_text = c_utils.nodeToCType(allocator, member_node.left.?) catch return ConvertError.Invalid_Var_Type;
+                    const c_type_text = c_utils.nodeToCTypeWithSelf(allocator, member_node.left.?, data.current_struct_name) catch return ConvertError.Invalid_Var_Type;
                     try data.appendCodeFmt(allocator, "\t{s} {s};\n", .{ c_type_text, var_name });
                 }
             } else if (member_node.node_type == ASTNodeType.FunctionDeclaration) {
@@ -75,7 +75,7 @@ pub fn processBehave(allocator: *Allocator, data: *ConvertData, node: *ASTNode) 
                 const func_name = member_node.token.?.value;
                 var ret_type: []const u8 = "void";
                 if (member_node.left != null and member_node.left.?.left != null) {
-                    ret_type = c_utils.nodeToCType(allocator, member_node.left.?.left.?) catch "void";
+                    ret_type = c_utils.nodeToCTypeWithSelf(allocator, member_node.left.?.left.?, data.current_struct_name) catch "void";
                 }
 
                 try data.appendCodeFmt(allocator, "\t{s} (*{s})(", .{ ret_type, func_name });
