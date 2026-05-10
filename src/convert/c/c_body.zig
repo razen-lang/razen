@@ -33,19 +33,29 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
     data.error_function = "processFunctionBodyNode";
 
     switch (node.node_type) {
-        ASTNodeType.VarDeclaration => try c_declaration.processDeclaration(allocator, data, node, add_new_line, add_tabs),
-        ASTNodeType.ConstDeclaration => try c_declaration.processDeclaration(allocator, data, node, add_new_line, add_tabs),
-        ASTNodeType.Assignment => try c_assignment.processAssignment(allocator, data, node, add_new_line, add_tabs),
+        ASTNodeType.VarDeclaration => {
+            try c_declaration.processDeclaration(allocator, data, node, add_new_line, add_tabs);
+            data.last_statement_was_return = false;
+        },
+        ASTNodeType.ConstDeclaration => {
+            try c_declaration.processDeclaration(allocator, data, node, add_new_line, add_tabs);
+            data.last_statement_was_return = false;
+        },
+        ASTNodeType.Assignment => {
+            try c_assignment.processAssignment(allocator, data, node, add_new_line, add_tabs);
+            data.last_statement_was_return = false;
+        },
         ASTNodeType.FunctionCall => {
             if (add_tabs) try data.addTab(allocator);
             const call_str = try c_expr.printExpression(allocator, data, node);
-            try data.appendCodeFmt(allocator, "{s};", .{ call_str });
+            try data.appendCodeFmt(allocator, "{s};", .{call_str});
             if (add_new_line) try data.appendCode(allocator, "\n");
+            data.last_statement_was_return = false;
         },
         ASTNodeType.IfStatement => {
             if (add_tabs) try data.addTab(allocator);
             const cond = try c_expr.printExpression(allocator, data, node.left.?);
-            try data.appendCodeFmt(allocator, "if ({s}) {{\n", .{ cond });
+            try data.appendCodeFmt(allocator, "if ({s}) {{\n", .{cond});
             data.incrementIndexCount();
             if (node.middle != null) {
                 try processBody(allocator, data, node.middle.?);
@@ -60,10 +70,11 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
                 try data.addTab(allocator);
             }
             try data.appendCode(allocator, "}\n");
+            data.last_statement_was_return = false;
         },
         ASTNodeType.LoopStatement => {
             if (add_tabs) try data.addTab(allocator);
-            
+
             if (node.left != null and node.middle != null and node.right != null) {
                 // loop items |i| { ... }
                 const items = try c_expr.printExpression(allocator, data, node.left.?);
@@ -90,18 +101,19 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
                 try data.addTab(allocator);
                 try data.appendCode(allocator, "}\n");
             }
+            data.last_statement_was_return = false;
         },
         ASTNodeType.MatchStatement => {
             if (node.left == null or node.children == null) return ConvertError.Node_Is_Null;
             const match_var = try c_expr.printExpression(allocator, data, node.left.?);
-            
+
             if (add_tabs) try data.addTab(allocator);
-            try data.appendCodeFmt(allocator, "// Match {s}\n", .{ match_var });
-            
+            try data.appendCodeFmt(allocator, "// Match {s}\n", .{match_var});
+
             for (node.children.?.items, 0..) |case_node, i| {
                 if (case_node.node_type != ASTNodeType.MatchCase) continue;
                 if (add_tabs) try data.addTab(allocator);
-                
+
                 if (case_node.left != null) {
                     const cond = try c_expr.printExpression(allocator, data, case_node.left.?);
                     if (i == 0) {
@@ -112,16 +124,17 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
                 } else {
                     try data.appendCode(allocator, "else {\n");
                 }
-                
+
                 data.incrementIndexCount();
                 if (case_node.right != null and case_node.right.?.left != null) {
                     try processBody(allocator, data, case_node.right.?.left.?); // block inside MatchBody
                 }
                 data.decrementIndexCount();
-                
+
                 if (add_tabs) try data.addTab(allocator);
                 try data.appendCode(allocator, "}\n");
             }
+            data.last_statement_was_return = false;
         },
         ASTNodeType.DeferStatement => {
             if (add_tabs) try data.addTab(allocator);
@@ -130,25 +143,29 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
                 // For now, emit it inline, but in a real C backend this would be injected at `return`.
                 try processBody(allocator, data, node.left.?);
             }
+            data.last_statement_was_return = false;
         },
         ASTNodeType.MemberAccess => {
             if (add_tabs) try data.addTab(allocator);
             const call_str = try c_expr.printExpression(allocator, data, node);
-            try data.appendCodeFmt(allocator, "{s};", .{ call_str });
+            try data.appendCodeFmt(allocator, "{s};", .{call_str});
             if (add_new_line) try data.appendCode(allocator, "\n");
+            data.last_statement_was_return = false;
         },
         ASTNodeType.ReturnStatement => {
-             // If we had a break statement it uses ASTNodeType.ReturnStatement sometimes depending on token.
-             if (node.token != null and std.mem.eql(u8, node.token.?.value, "break")) {
-                 if (add_tabs) try data.addTab(allocator);
-                 try data.appendCode(allocator, "break;\n");
-             } else {
-                 try c_return.processReturn(allocator, data, node);
-             }
+            // If we had a break statement it uses ASTNodeType.ReturnStatement sometimes depending on token.
+            if (node.token != null and std.mem.eql(u8, node.token.?.value, "break")) {
+                if (add_tabs) try data.addTab(allocator);
+                try data.appendCode(allocator, "break;\n");
+                data.last_statement_was_return = false;
+            } else {
+                data.last_statement_was_return = true;
+                try c_return.processReturn(allocator, data, node);
+            }
         },
         else => {
             if (add_tabs) try data.addTab(allocator);
-            try data.appendCodeFmt(allocator, "// TODO: Handle node ({any})\n", .{ node.node_type });
-        }
+            try data.appendCodeFmt(allocator, "// TODO: Handle node ({any})\n", .{node.node_type});
+        },
     }
 }

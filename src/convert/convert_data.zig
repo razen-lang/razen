@@ -44,6 +44,7 @@ pub const ConvertData = struct {
     error_detail: ?[]const u8 = null,
     error_token: ?Token = null,
     error_function: ?[]const u8 = null,
+    last_statement_was_return: bool = false,
 
     // grabs the next AST node to convert
     pub fn getNode(self: *ConvertData) ?*ASTNode {

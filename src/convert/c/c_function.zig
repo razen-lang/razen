@@ -22,10 +22,12 @@ pub fn processFunctionDeclaration(allocator: *Allocator, data: *ConvertData, nod
     const is_main = std.mem.eql(u8, func_name, "main");
 
     var return_type: []const u8 = "void";
+    if (node.left != null and node.left.?.left != null) {
+        return_type = c_utils.nodeToCType(allocator, node.left.?.left.?) catch "void";
+    }
+    // After getting return_type, force main to use "int"
     if (is_main) {
         return_type = "int";
-    } else if (node.left != null and node.left.?.left != null) {
-        return_type = c_utils.nodeToCType(allocator, node.left.?.left.?) catch "void";
     }
 
     try data.appendCodeFmt(allocator, "{s} {s}(", .{ return_type, func_name });
@@ -41,7 +43,7 @@ pub fn processFunctionDeclaration(allocator: *Allocator, data: *ConvertData, nod
         try c_body.processBody(allocator, data, node.right.?);
     }
 
-    if (is_main) {
+    if (is_main and !data.last_statement_was_return) {
         try data.addTab(allocator);
         try data.appendCode(allocator, "return 0;\n");
     }

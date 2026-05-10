@@ -55,7 +55,7 @@ fn convertCode(source: []const u8) void {
         print("{s}Semantic Analysis error: {}{s}\n", .{ lexer.RED, err, lexer.RESET });
         return;
     };
-    
+
     if (analyzer.has_errors) {
         print("\n{s}Compilation failed due to semantic errors.{s}\n", .{ lexer.RED, lexer.RESET });
         return; // Halt compilation!
@@ -78,17 +78,17 @@ pub fn main() void {
     print("\n{s}▶ Sample: RETURN_ZERO{s}\n", .{ lexer.CYAN, lexer.RESET });
     convertCode(code_samples.RETURN_ZERO);
 
-    print("\n{s}▶ Sample: ARITH_EXPR{s}\n", .{ lexer.CYAN, lexer.RESET });
-    convertCode(code_samples.ARITH_EXPR);
+    // print("\n{s}▶ Sample: ARITH_EXPR{s}\n", .{ lexer.CYAN, lexer.RESET });
+    // convertCode(code_samples.ARITH_EXPR);
 
-    print("\n{s}▶ Sample: IF_ELSE{s}\n", .{ lexer.CYAN, lexer.RESET });
-    convertCode(code_samples.IF_ELSE);
+    // print("\n{s}▶ Sample: IF_ELSE{s}\n", .{ lexer.CYAN, lexer.RESET });
+    // convertCode(code_samples.IF_ELSE);
 
-    print("\n{s}▶ Sample: FULL_PROGRAM{s}\n", .{ lexer.CYAN, lexer.RESET });
-    convertCode(code_samples.FULL_PROGRAM);
+    // print("\n{s}▶ Sample: FULL_PROGRAM{s}\n", .{ lexer.CYAN, lexer.RESET });
+    // convertCode(code_samples.FULL_PROGRAM);
 
-    print("\n{s}▶ Sample: PHASE 2 EXHAUSTIVE TESTING{s}\n", .{ lexer.CYAN, lexer.RESET });
-    convertCode(code_samples.PHASE_2_EXHAUSTIVE);
+    // print("\n{s}▶ Sample: PHASE 2 EXHAUSTIVE TESTING{s}\n", .{ lexer.CYAN, lexer.RESET });
+    // convertCode(code_samples.PHASE_2_EXHAUSTIVE);
 
     // print("\n{s}▶ Sample: SEMANTIC ERROR TESTING{s}\n", .{ lexer.CYAN, lexer.RESET });
     // convertCode(semantic_samples.SEMANTIC_ERROR_PROGRAM);
