@@ -46,6 +46,28 @@ pub fn nodeToCTypeWithSelf(allocator: *Allocator, node: *ASTNode, current_struct
     if (node.node_type == ASTNodeType.VarType) {
         const tok = node.token orelse return "void";
 
+        // F1 FIX: ?T optional -> Option_<T> struct
+        if (tok.token_type == TokenType.QuestionMark and node.left != null) {
+            const inner = try nodeToCTypeWithSelf(allocator, node.left.?, current_struct);
+            return std.fmt.allocPrint(allocator.*, "Option_{s}", .{inner}) catch "void*";
+        }
+
+        // F2 FIX: !T failable (anonymous) -> Result_<T>
+        //         Error!T typed error -> <Error>_Result (with specific error type)
+        if (tok.token_type == TokenType.ExclamationMark and node.left != null) {
+            if (node.left.?.node_type == ASTNodeType.VarType and
+                node.left.?.left != null)
+            {
+                // Error!T: tok=!, left=ErrorType, left.left=T
+                const err_type = try nodeToCTypeWithSelf(allocator, node.left.?, current_struct);
+                const val_type = try nodeToCTypeWithSelf(allocator, node.left.?.left.?, current_struct);
+                return std.fmt.allocPrint(allocator.*, "{s}_Result_{s}", .{ err_type, val_type }) catch "void*";
+            }
+            // plain !T
+            const inner = try nodeToCTypeWithSelf(allocator, node.left.?, current_struct);
+            return std.fmt.allocPrint(allocator.*, "Result_{s}", .{inner}) catch "void*";
+        }
+
         // primitive type
         if (convertToCType(tok.token_type)) |prim| {
             if (node.left != null) {

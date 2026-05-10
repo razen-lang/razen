@@ -269,6 +269,55 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             return inner;
         },
 
+        // ── .{expr, ...} tuple literal ──────────────────────────────────────
+        // F13: used for format args: fmt.println("{}", .{name})
+        TokenType.Dot => {
+            ast_data.advance(); // eat '.'
+            const next_tok = try ast_data.getToken();
+            if (next_tok.token_type == TokenType.LeftBrace) {
+                ast_data.advance(); // eat '{'
+                const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
+                n.node_type = ASTNodeType.ArrayLiteral; // reuse ArrayLiteral for tuples
+                n.token = tok;
+                n.children = try ast_utils.createChildList(allocator);
+                var guard_t: usize = 0;
+                while (ast_data.hasMore()) {
+                    guard_t += 1;
+                    if (guard_t > 200) break;
+                    const cur: Token = try ast_data.getToken();
+                    if (cur.token_type == TokenType.RightBrace) {
+                        ast_data.advance();
+                        break;
+                    }
+                    const elem = try parseBinaryExpr(allocator, ast_data, 0);
+                    if (elem) |e| {
+                        n.children.?.append(allocator.*, e) catch return AstError.Out_Of_Memory;
+                    }
+                    if (ast_data.hasMore()) {
+                        const comma: Token = try ast_data.getToken();
+                        if (comma.token_type == TokenType.Comma) ast_data.advance();
+                    }
+                }
+                return n;
+            }
+            // plain dot without brace — not a tuple, back up
+            ast_data.token_index -= 1;
+            return null;
+        },
+
+        // ── &x address-of ────────────────────────────────────────────────────
+        // F16: &x -> UnaryExpression(&, x)
+        TokenType.And => {
+            ast_data.advance(); // eat '&'
+            const operand = try parsePrimary(allocator, ast_data);
+            if (operand == null) return null;
+            const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
+            n.node_type = ASTNodeType.UnaryExpression;
+            n.token = tok;
+            n.left = operand;
+            return n;
+        },
+
         // anything else isn't an expression — return null and let the caller decide
         else => return null,
     }
@@ -300,6 +349,23 @@ pub fn parseBinaryExpr(
         if (prec < min_prec) break;
 
         ast_data.advance(); // eat the operator
+
+        // F16 FIX: ptr.* dereference — Dot followed by Star means deref
+        if (op_tok.token_type == TokenType.Dot) {
+            const peek_star = ast_data.peekToken(0);
+            if (peek_star != null and peek_star.?.token_type == TokenType.Star) {
+                ast_data.advance(); // eat '*'
+                // Wrap in UnaryExpression(".*", left) for c_expr to handle
+                const deref: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
+                deref.node_type = ASTNodeType.UnaryExpression;
+                var star_tok = peek_star.?;
+                star_tok.value = ".*"; // mark as deref
+                deref.token = star_tok;
+                deref.left = left;
+                left = deref;
+                continue;
+            }
+        }
 
         // recurse with prec+1 so left-associative operators work correctly
         const right: ?*ASTNode = try parseBinaryExpr(allocator, ast_data, prec + 1);
