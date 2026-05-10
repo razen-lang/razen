@@ -10,6 +10,20 @@ const ConvertError = errors.ConvertError;
 const Allocator = std.mem.Allocator;
 const String = []const u8;
 
+/// printLValue: like printExpression but MemberAccess uses '.' (for assignment targets like c.value).
+/// Dot-notation (struct field access) is needed on the LHS of assignments.
+pub fn printLValue(allocator: *Allocator, data: *ConvertData, node: *ASTNode) ConvertError!String {
+    if (node.token == null) return ConvertError.Node_Is_Null;
+    if (node.node_type == ASTNodeType.MemberAccess) {
+        if (node.left == null or node.right == null) return ConvertError.Node_Is_Null;
+        const left = try printLValue(allocator, data, node.left.?);
+        const right = try printLValue(allocator, data, node.right.?);
+        return std.fmt.allocPrint(allocator.*, "{s}.{s}", .{ left, right }) catch return ConvertError.Out_Of_Memory;
+    }
+    // everything else: delegate to printExpression
+    return printExpression(allocator, data, node);
+}
+
 pub fn printExpression(allocator: *Allocator, data: *ConvertData, node: *ASTNode) ConvertError!String {
     if (node.token == null) {
         return ConvertError.Node_Is_Null;
@@ -43,12 +57,63 @@ pub fn printExpression(allocator: *Allocator, data: *ConvertData, node: *ASTNode
         },
         ASTNodeType.MemberAccess => {
             if (node.left == null or node.right == null) return ConvertError.Node_Is_Null;
+
+            // C7 FIX: detect union variant construction: Value.Int(42)
+            // Parsed as MemberAccess(Identifier(Value), FunctionCall(Int, [42]))
+            if (node.right.?.node_type == ASTNodeType.FunctionCall) {
+                const union_name = node.left.?.token.?.value;
+                const variant_name = node.right.?.token.?.value;
+                const c_unions = @import("c_unions.zig");
+                if (c_unions.lookupVariantType(data, union_name, variant_name)) |variant_type| {
+                    // it IS a known union constructor
+                    const tag = std.fmt.allocPrint(allocator.*, "{s}_{s}", .{ union_name, variant_name }) catch return ConvertError.Out_Of_Memory;
+                    if (std.mem.eql(u8, variant_type, "unit")) {
+                        // unit variant: (Value){ .tag = Value_Idle }
+                        return std.fmt.allocPrint(allocator.*, "({s}){{ .tag = {s} }}", .{ union_name, tag }) catch return ConvertError.Out_Of_Memory;
+                    } else if (std.mem.eql(u8, variant_type, "struct")) {
+                        // struct variant — emit as-is for now (needs named fields)
+                        return std.fmt.allocPrint(allocator.*, "({s}){{ .tag = {s} }}", .{ union_name, tag }) catch return ConvertError.Out_Of_Memory;
+                    } else {
+                        // payload variant: (Value){ .tag = Value_Int, .data = { .Int = 42 } }
+                        var payload_str = std.ArrayList(u8).initCapacity(allocator.*, 0) catch return ConvertError.Out_Of_Memory;
+                        if (node.right.?.children != null) {
+                            for (node.right.?.children.?.items, 0..) |arg, i| {
+                                if (arg.left != null) {
+                                    const av = try printExpression(allocator, data, arg.left.?);
+                                    payload_str.appendSlice(allocator.*, av) catch return ConvertError.Out_Of_Memory;
+                                }
+                                if (i < node.right.?.children.?.items.len - 1) {
+                                    payload_str.appendSlice(allocator.*, ", ") catch return ConvertError.Out_Of_Memory;
+                                }
+                            }
+                        }
+                        return std.fmt.allocPrint(allocator.*, "({s}){{ .tag = {s}, .data = {{ .{s} = {s} }} }}",
+                            .{ union_name, tag, variant_name, payload_str.items }) catch return ConvertError.Out_Of_Memory;
+                    }
+                }
+                // not a known union constructor — fall through to namespace call
+                // e.g. std.fmt.println(...) → std_fmt_println(...)
+                const func_name_raw = try printExpression(allocator, data, node.left.?);
+                const right_call = node.right.?;
+                const func_full = std.fmt.allocPrint(allocator.*, "{s}_{s}", .{ func_name_raw, right_call.token.?.value }) catch return ConvertError.Out_Of_Memory;
+                var args_str = std.ArrayList(u8).initCapacity(allocator.*, 0) catch return ConvertError.Out_Of_Memory;
+                if (right_call.children != null) {
+                    for (right_call.children.?.items, 0..) |arg, i| {
+                        if (arg.left != null) {
+                            const av = try printExpression(allocator, data, arg.left.?);
+                            args_str.appendSlice(allocator.*, av) catch return ConvertError.Out_Of_Memory;
+                        }
+                        if (i < right_call.children.?.items.len - 1) {
+                            args_str.appendSlice(allocator.*, ", ") catch return ConvertError.Out_Of_Memory;
+                        }
+                    }
+                }
+                return std.fmt.allocPrint(allocator.*, "{s}({s})", .{ func_full, args_str.items }) catch return ConvertError.Out_Of_Memory;
+            }
+
+            // plain member access: std.fmt → std_fmt, State.Open → State_Open
             const left = try printExpression(allocator, data, node.left.?);
             const right = try printExpression(allocator, data, node.right.?);
-            // Razen uses . for both struct fields and static namespace access (e.g. State.Open).
-            // In C, namespaces usually use underscores (State_Open). For now we output `left.right` or `left_right`.
-            // We'll use `_` for simplicity since C doesn't have namespaces.
-            // Actually, `std.io.print` -> `std_io_print`.
             return std.fmt.allocPrint(allocator.*, "{s}_{s}", .{ left, right }) catch return ConvertError.Out_Of_Memory;
         },
         ASTNodeType.FunctionCall => {

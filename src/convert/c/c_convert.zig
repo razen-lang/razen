@@ -38,6 +38,7 @@ pub fn convert(allocator: *Allocator, ast_nodes: *ArrayList(*ASTNode), source: [
         .generated_code = &generated_code,
         .var_types = std.StringHashMap([]const u8).init(allocator.*),
         .deferred_stmts = std.ArrayList(*ASTNode).initCapacity(allocator.*, 0) catch return ConvertError.Out_Of_Memory,
+        .union_registry = std.StringHashMap(std.StringHashMap([]const u8)).init(allocator.*),
     };
 
     data.error_function = "convert";
