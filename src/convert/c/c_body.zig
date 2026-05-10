@@ -8,6 +8,7 @@ const c_declaration = @import("c_declaration.zig");
 const c_assignment = @import("c_assignment.zig");
 const c_expr = @import("c_expr.zig");
 const c_utils = @import("c_utils.zig");
+const c_unions = @import("c_unions.zig");
 
 const ASTNode = node_mod.ASTNode;
 const ASTNodeType = node_mod.ASTNodeType;
@@ -113,13 +114,35 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
             data.last_statement_was_return = false;
         },
 
-        // C3 FIX: match → switch/case (already correct), but also handles tagged-union payload
+        // C3+C6 FIX: match → switch/case with tagged-union payload extraction
         ASTNodeType.MatchStatement => {
             if (node.left == null or node.children == null) return ConvertError.Node_Is_Null;
             const match_var = try c_expr.printExpression(allocator, data, node.left.?);
 
+            // C6 FIX: use .tag if match_var is a known tagged union.
+            // Check var_types first, then check if any case pattern uses a registered union name.
+            const match_var_type = data.lookupVarType(match_var);
+            var is_union = if (match_var_type) |t| data.union_registry.contains(t) else false;
+            // Second pass: peek at the first non-else case pattern to detect union
+            if (!is_union and node.children != null) {
+                for (node.children.?.items) |cn| {
+                    if (cn.node_type != ASTNodeType.MatchCase or cn.left == null) continue;
+                    if (cn.left.?.node_type == ASTNodeType.MemberAccess and cn.left.?.left != null) {
+                        const u_name = cn.left.?.left.?.token.?.value;
+                        if (data.union_registry.contains(u_name)) {
+                            is_union = true;
+                        }
+                    }
+                    break;
+                }
+            }
+            const switch_expr = if (is_union)
+                (std.fmt.allocPrint(allocator.*, "{s}.tag", .{match_var}) catch return ConvertError.Out_Of_Memory)
+            else
+                match_var;
+
             if (add_tabs) try data.addTab(allocator);
-            try data.appendCodeFmt(allocator, "switch ({s}) {{\n", .{match_var});
+            try data.appendCodeFmt(allocator, "switch ({s}) {{\n", .{switch_expr});
 
             for (node.children.?.items) |case_node| {
                 if (case_node.node_type != ASTNodeType.MatchCase) continue;
@@ -127,14 +150,23 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
                 if (add_tabs) try data.addTab(allocator);
 
                 if (case_node.left != null) {
-                    const raw_label = try c_expr.printExpression(allocator, data, case_node.left.?);
-                    const case_label = try dotToUnderscore(allocator, raw_label);
-                    try data.appendCodeFmt(allocator, "case {s}:\n", .{case_label});
+                    // C6: detect payload pattern: Value.Int(v) parsed as MemberAccess(Value, FunctionCall(Int,[v]))
+                    const payload = try extractMatchPayload(allocator, data, case_node.left.?, match_var);
+                    try data.appendCodeFmt(allocator, "case {s}:\n", .{payload.case_label});
+                    data.incrementIndexCount();
+                    // emit payload binding before the body
+                    if (payload.binding_name != null and payload.binding_type != null and payload.variant_name != null) {
+                        try data.addTab(allocator);
+                        try data.appendCodeFmt(allocator, "{s} {s} = {s}.data.{s};\n",
+                            .{ payload.binding_type.?, payload.binding_name.?, match_var, payload.variant_name.? });
+                        // register binding type for later use
+                        data.var_types.put(payload.binding_name.?, payload.binding_type.?) catch {};
+                    }
                 } else {
                     try data.appendCode(allocator, "default:\n");
+                    data.incrementIndexCount();
                 }
 
-                data.incrementIndexCount();
                 if (case_node.right != null and case_node.right.?.left != null) {
                     try processBody(allocator, data, case_node.right.?.left.?);
                 }
@@ -279,4 +311,75 @@ fn dotToUnderscore(allocator: *Allocator, s: []const u8) ConvertError![]u8 {
         if (c.* == '.') c.* = '_';
     }
     return result;
+}
+
+const MatchPayload = struct {
+    case_label: []const u8,     // e.g. "Value_Int"
+    variant_name: ?[]const u8,  // e.g. "Int"
+    binding_name: ?[]const u8,  // e.g. "v"
+    binding_type: ?[]const u8,  // e.g. "i32"
+};
+
+/// C6 FIX: Parse a match pattern and extract:
+///   - case_label: the C enum tag to switch on (e.g. "Value_Int")
+///   - binding: the variable to declare from the payload (e.g. "v")
+///   - binding_type: C type from the union registry
+///
+/// Patterns handled:
+///   State.Open           → case State_Open (no payload)
+///   Value.Int(v)         → case Value_Int + i32 v = match_var.data.Int;
+///   parsed as MemberAccess(Value, FunctionCall(Int, [Identifier(v)]))
+fn extractMatchPayload(
+    allocator: *Allocator,
+    data: *ConvertData,
+    pattern: *ASTNode,
+    _match_var: []const u8,
+) ConvertError!MatchPayload {
+    _ = _match_var;
+
+    // Case 1: plain MemberAccess like State.Open (no parens after)
+    if (pattern.node_type == ASTNodeType.MemberAccess) {
+        if (pattern.left == null or pattern.right == null) {
+            return MatchPayload{ .case_label = "default", .variant_name = null, .binding_name = null, .binding_type = null };
+        }
+        const union_name = pattern.left.?.token.?.value;
+
+        // right is either Identifier (no payload) or FunctionCall (with payload)
+        if (pattern.right.?.node_type == ASTNodeType.FunctionCall) {
+            // Value.Int(v) — payload binding
+            const variant_name = pattern.right.?.token.?.value;
+            const case_label = std.fmt.allocPrint(allocator.*, "{s}_{s}", .{ union_name, variant_name }) catch return ConvertError.Out_Of_Memory;
+
+            // extract binding variable name from first argument
+            var binding_name: ?[]const u8 = null;
+            if (pattern.right.?.children != null and pattern.right.?.children.?.items.len > 0) {
+                const arg = pattern.right.?.children.?.items[0];
+                if (arg.node_type == ASTNodeType.Argument and arg.left != null) {
+                    binding_name = arg.left.?.token.?.value;
+                } else if (arg.token != null) {
+                    binding_name = arg.token.?.value;
+                }
+            }
+
+            // look up the variant's C type from the registry
+            const binding_type = c_unions.lookupVariantType(data, union_name, variant_name);
+
+            return MatchPayload{
+                .case_label = case_label,
+                .variant_name = variant_name,
+                .binding_name = binding_name,
+                .binding_type = binding_type,
+            };
+        } else {
+            // State.Open — no payload
+            const variant_name = pattern.right.?.token.?.value;
+            const case_label = std.fmt.allocPrint(allocator.*, "{s}_{s}", .{ union_name, variant_name }) catch return ConvertError.Out_Of_Memory;
+            return MatchPayload{ .case_label = case_label, .variant_name = variant_name, .binding_name = null, .binding_type = null };
+        }
+    }
+
+    // Fallback: just print the expression and underscore-escape it
+    const raw = try c_expr.printExpression(allocator, data, pattern);
+    const label = try dotToUnderscore(allocator, raw);
+    return MatchPayload{ .case_label = label, .variant_name = null, .binding_name = null, .binding_type = null };
 }

@@ -54,6 +54,9 @@ pub const ConvertData = struct {
     tmp_counter: usize = 0,
     // C4 FIX: current struct/behave name so @Self can resolve to the correct C type
     current_struct_name: ?[]const u8 = null,
+    // C6/C7 FIX: registry of union type names → their variant field names and types
+    // Key: union_name (e.g. "Value"), Value: StringHashMap of variant_name → c_type
+    union_registry: std.StringHashMap(std.StringHashMap([]const u8)),
 
     pub fn getNode(self: *ConvertData) ?*ASTNode {
         if (self.node_index >= self.ast_nodes.items.len) {

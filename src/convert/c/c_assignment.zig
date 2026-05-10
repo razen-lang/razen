@@ -21,7 +21,8 @@ pub fn processAssignment(allocator: *Allocator, data: *ConvertData, node: *ASTNo
         try data.addTab(allocator);
     }
 
-    const target = try c_expr.printExpression(allocator, data, node.left.?);
+    // C8 FIX: use printLValue so field access (c.value) uses '.' not '_'
+    const target = try c_expr.printLValue(allocator, data, node.left.?);
 
     if (node.right == null) {
         try data.appendCodeFmt(allocator, "{s} {s};", .{ target, node.token.?.value });

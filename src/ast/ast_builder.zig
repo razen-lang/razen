@@ -349,8 +349,27 @@ fn parseIdentifierStatement(allocator: *Allocator, d: *ASTData, is_mut: bool) As
         consumeSemi(d);
         return node;
     }
-    // anything else, try to parse it as a binary expression
+    // anything else (e.g. c.value += 1 — starts with name then dot)
+    // parse the LHS as a binary expression first
     const expr = try expr_mod.parseBinaryExpr(allocator, d, 0);
+
+    // C8 FIX: after parsing the LHS, check if we're now sitting on an assignment operator
+    // e.g. c.value += 1  =>  lhs=MemberAccess(c,value), next token is +=
+    if (d.hasMore()) {
+        const maybe_op: Token = try d.getToken();
+        if (tok_utils.isAssignmentOperator(maybe_op.token_type)) {
+            d.advance(); // eat the operator
+            const rhs = try expr_mod.parseBinaryExpr(allocator, d, 0);
+            consumeSemi(d);
+            const assign: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
+            assign.node_type = ASTNodeType.Assignment;
+            assign.token = maybe_op;
+            assign.left = expr;
+            assign.right = rhs;
+            return assign;
+        }
+    }
+
     consumeSemi(d);
     if (expr) |e| return e;
     const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);

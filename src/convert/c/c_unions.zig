@@ -20,11 +20,17 @@ const Allocator = std.mem.Allocator;
 ///       } data;
 ///   } NetErr;
 ///
+/// C6/C7 FIX: Also register this union in data.union_registry so that:
+///   - match pattern `Value.Int(v)` can extract the payload: `i32 v = match_var.data.Int;`
+///   - construction `Value.Int(42)` emits: `(Value){ .tag = Value_Int, .data = { .Int = 42 } }`
 pub fn processUnion(allocator: *Allocator, data: *ConvertData, node: *ASTNode) ConvertError!void {
     data.error_function = "processUnion";
 
     if (node.token == null) return ConvertError.Node_Is_Null;
     const union_name = node.token.?.value;
+
+    // Build the variant registry for this union
+    var variant_map = std.StringHashMap([]const u8).init(allocator.*);
 
     // ── outer struct ──────────────────────────────────────────────────────
     try data.appendCodeFmt(allocator, "typedef struct {{\n", .{});
@@ -49,9 +55,11 @@ pub fn processUnion(allocator: *Allocator, data: *ConvertData, node: *ASTNode) C
             const var_name = member_node.token.?.value;
 
             if (member_node.left != null) {
-                // simple variant: Code: i32
+                // simple/tuple variant: Code: i32  or  Int(i64)
                 const c_type = c_utils.nodeToCType(allocator, member_node.left.?) catch "void*";
                 try data.appendCodeFmt(allocator, "\t\t{s} {s};\n", .{ c_type, var_name });
+                // register: "Int" -> "i32"
+                variant_map.put(var_name, c_type) catch {};
             } else if (member_node.children != null) {
                 // struct variant: Binary { left: Expr, right: Expr, op: str }
                 try data.appendCode(allocator, "\t\tstruct {\n");
@@ -62,9 +70,13 @@ pub fn processUnion(allocator: *Allocator, data: *ConvertData, node: *ASTNode) C
                     }
                 }
                 try data.appendCodeFmt(allocator, "\t\t}} {s};\n", .{var_name});
+                // register struct variant with sentinel type "struct"
+                variant_map.put(var_name, "struct") catch {};
             } else {
-                // unit variant (no payload) — use a sentinel byte
+                // unit variant (no payload)
                 try data.appendCodeFmt(allocator, "\t\tuint8_t _{s}_unit;\n", .{var_name});
+                // register unit variant with sentinel type "unit"
+                variant_map.put(var_name, "unit") catch {};
             }
         }
     }
@@ -72,4 +84,16 @@ pub fn processUnion(allocator: *Allocator, data: *ConvertData, node: *ASTNode) C
 
     // ── close outer struct ────────────────────────────────────────────────
     try data.appendCodeFmt(allocator, "}} {s};\n\n", .{union_name});
+
+    // Register into the global union registry
+    data.union_registry.put(union_name, variant_map) catch {};
+}
+
+/// Look up the C type for a specific variant of a union.
+/// Returns null if not found.
+pub fn lookupVariantType(data: *ConvertData, union_name: []const u8, variant_name: []const u8) ?[]const u8 {
+    if (data.union_registry.get(union_name)) |variant_map| {
+        return variant_map.get(variant_name);
+    }
+    return null;
 }
