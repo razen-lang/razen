@@ -81,15 +81,16 @@ pub fn main() void {
     print("\n{s}▶ Sample: ARITH_EXPR{s}\n", .{ lexer.CYAN, lexer.RESET });
     convertCode(code_samples.ARITH_EXPR);
 
-    // print("\n{s}▶ Sample: IF_ELSE{s}\n", .{ lexer.CYAN, lexer.RESET });
-    // convertCode(code_samples.IF_ELSE);
+    print("\n{s}▶ Sample: IF_ELSE{s}\n", .{ lexer.CYAN, lexer.RESET });
+    convertCode(code_samples.IF_ELSE);
 
-    // print("\n{s}▶ Sample: FULL_PROGRAM{s}\n", .{ lexer.CYAN, lexer.RESET });
-    // convertCode(code_samples.FULL_PROGRAM);
+    print("\n{s}▶ Sample: FULL_PROGRAM{s}\n", .{ lexer.CYAN, lexer.RESET });
+    convertCode(code_samples.FULL_PROGRAM);
 
-    // print("\n{s}▶ Sample: PHASE 2 EXHAUSTIVE TESTING{s}\n", .{ lexer.CYAN, lexer.RESET });
-    // convertCode(code_samples.PHASE_2_EXHAUSTIVE);
+    print("\n{s}▶ Sample: PHASE 2 EXHAUSTIVE TESTING{s}\n", .{ lexer.CYAN, lexer.RESET });
+    convertCode(code_samples.PHASE_2_EXHAUSTIVE);
 
+    // Semantic error test — commented out by default as it intentionally fails
     // print("\n{s}▶ Sample: SEMANTIC ERROR TESTING{s}\n", .{ lexer.CYAN, lexer.RESET });
     // convertCode(semantic_samples.SEMANTIC_ERROR_PROGRAM);
 }

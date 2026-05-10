@@ -24,9 +24,12 @@ pub fn convert(allocator: *Allocator, ast_nodes: *ArrayList(*ASTNode), source: [
 
     var generated_code = StringBuilder.init(allocator.*) catch return ConvertError.Out_Of_Memory;
 
+    // Bug 4+7: initialise new ConvertData fields
     var data = ConvertData{
         .ast_nodes = ast_nodes,
         .generated_code = &generated_code,
+        .var_types = std.StringHashMap([]const u8).init(allocator.*),
+        .deferred_stmts = std.ArrayList(*ASTNode).initCapacity(allocator.*, 0) catch return ConvertError.Out_Of_Memory,
     };
 
     data.error_function = "convert";
@@ -81,6 +84,7 @@ fn processGlobalNode(allocator: *Allocator, data: *ConvertData) ConvertError!voi
         ASTNodeType.EnumDeclaration => try c_enums.processEnum(allocator, data, node.?),
         ASTNodeType.ErrorDeclaration => try c_enums.processErrorDecl(allocator, data, node.?),
         ASTNodeType.UnionDeclaration => try c_unions.processUnion(allocator, data, node.?),
+        // Bug 6: ExtDeclaration is now handled properly in processFunctionDeclaration
         ASTNodeType.ExtDeclaration => try c_function.processFunctionDeclaration(allocator, data, node.?),
         ASTNodeType.ModuleDeclaration => {
             // C doesn't have modules, we'll emit a comment

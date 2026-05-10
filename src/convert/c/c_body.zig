@@ -29,6 +29,11 @@ pub fn processBody(allocator: *Allocator, data: *ConvertData, node: *ASTNode) Co
     }
 }
 
+/// Public wrapper used by c_function.emitDeferredStatements to replay stored nodes.
+pub fn processStatement(allocator: *Allocator, data: *ConvertData, node: *ASTNode) ConvertError!void {
+    try processFunctionBodyNode(allocator, data, node, true, true);
+}
+
 fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *ASTNode, add_new_line: bool, add_tabs: bool) ConvertError!void {
     data.error_function = "processFunctionBodyNode";
 
@@ -103,48 +108,52 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
             }
             data.last_statement_was_return = false;
         },
+
+        // Bug 8: emit match as switch/case instead of if/else if
         ASTNodeType.MatchStatement => {
             if (node.left == null or node.children == null) return ConvertError.Node_Is_Null;
             const match_var = try c_expr.printExpression(allocator, data, node.left.?);
 
             if (add_tabs) try data.addTab(allocator);
-            try data.appendCodeFmt(allocator, "// Match {s}\n", .{match_var});
+            try data.appendCodeFmt(allocator, "switch ({s}) {{\n", .{match_var});
 
-            for (node.children.?.items, 0..) |case_node, i| {
+            for (node.children.?.items) |case_node| {
                 if (case_node.node_type != ASTNodeType.MatchCase) continue;
+
                 if (add_tabs) try data.addTab(allocator);
 
                 if (case_node.left != null) {
-                    const cond = try c_expr.printExpression(allocator, data, case_node.left.?);
-                    if (i == 0) {
-                        try data.appendCodeFmt(allocator, "if ({s} == {s}) {{\n", .{ match_var, cond });
-                    } else {
-                        try data.appendCodeFmt(allocator, "else if ({s} == {s}) {{\n", .{ match_var, cond });
-                    }
+                    // e.g. State.Open → State_Open
+                    const raw_label = try c_expr.printExpression(allocator, data, case_node.left.?);
+                    const case_label = try dotToUnderscore(allocator, raw_label);
+                    try data.appendCodeFmt(allocator, "case {s}:\n", .{case_label});
                 } else {
-                    try data.appendCode(allocator, "else {\n");
+                    // wildcard / else → default
+                    try data.appendCode(allocator, "default:\n");
                 }
 
                 data.incrementIndexCount();
                 if (case_node.right != null and case_node.right.?.left != null) {
-                    try processBody(allocator, data, case_node.right.?.left.?); // block inside MatchBody
+                    try processBody(allocator, data, case_node.right.?.left.?);
                 }
-                data.decrementIndexCount();
-
                 if (add_tabs) try data.addTab(allocator);
-                try data.appendCode(allocator, "}\n");
+                try data.appendCode(allocator, "break;\n");
+                data.decrementIndexCount();
             }
-            data.last_statement_was_return = false;
-        },
-        ASTNodeType.DeferStatement => {
+
             if (add_tabs) try data.addTab(allocator);
-            try data.appendCode(allocator, "// [Not fully supported in C] Deferred block:\n");
+            try data.appendCode(allocator, "}\n");
+            data.last_statement_was_return = false;
+        },
+
+        // Bug 7: don't emit defer immediately — collect it, flush before returns/end-of-function
+        ASTNodeType.DeferStatement => {
             if (node.left != null) {
-                // For now, emit it inline, but in a real C backend this would be injected at `return`.
-                try processBody(allocator, data, node.left.?);
+                data.deferred_stmts.append(allocator.*, node) catch return ConvertError.Out_Of_Memory;
             }
             data.last_statement_was_return = false;
         },
+
         ASTNodeType.MemberAccess => {
             if (add_tabs) try data.addTab(allocator);
             const call_str = try c_expr.printExpression(allocator, data, node);
@@ -153,7 +162,6 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
             data.last_statement_was_return = false;
         },
         ASTNodeType.ReturnStatement => {
-            // If we had a break statement it uses ASTNodeType.ReturnStatement sometimes depending on token.
             if (node.token != null and std.mem.eql(u8, node.token.?.value, "break")) {
                 if (add_tabs) try data.addTab(allocator);
                 try data.appendCode(allocator, "break;\n");
@@ -168,4 +176,13 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
             try data.appendCodeFmt(allocator, "// TODO: Handle node ({any})\n", .{node.node_type});
         },
     }
+}
+
+/// Bug 8 helper: replace every '.' with '_' in a label string (e.g. "State.Open" → "State_Open").
+fn dotToUnderscore(allocator: *Allocator, s: []const u8) ConvertError![]u8 {
+    const result = allocator.*.dupe(u8, s) catch return ConvertError.Out_Of_Memory;
+    for (result) |*c| {
+        if (c.* == '.') c.* = '_';
+    }
+    return result;
 }
