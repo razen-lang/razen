@@ -75,11 +75,11 @@ fn convertCode(source: []const u8) void {
 pub fn main() void {
     print("{s}Razen Lang — Phase 4 Pipeline{s}\n", .{ lexer.LIGHT_GREEN, lexer.RESET });
 
-    print("\n{s}▶ Sample: RETURN_ZERO{s}\n", .{ lexer.CYAN, lexer.RESET });
-    convertCode(code_samples.RETURN_ZERO);
+    // print("\n{s}▶ Sample: RETURN_ZERO{s}\n", .{ lexer.CYAN, lexer.RESET });
+    // convertCode(code_samples.RETURN_ZERO);
 
-    // print("\n{s}▶ Sample: ARITH_EXPR{s}\n", .{ lexer.CYAN, lexer.RESET });
-    // convertCode(code_samples.ARITH_EXPR);
+    print("\n{s}▶ Sample: ARITH_EXPR{s}\n", .{ lexer.CYAN, lexer.RESET });
+    convertCode(code_samples.ARITH_EXPR);
 
     // print("\n{s}▶ Sample: IF_ELSE{s}\n", .{ lexer.CYAN, lexer.RESET });
     // convertCode(code_samples.IF_ELSE);

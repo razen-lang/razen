@@ -42,24 +42,24 @@ pub fn nodeToCType(allocator: *Allocator, node: *ASTNode) ![]const u8 {
         const inner = try nodeToCType(allocator, node.left.?);
         return try std.fmt.allocPrint(allocator.*, "{s}*", .{inner});
     }
-    
+
     if (node.node_type == ASTNodeType.VarType) {
         const tok = node.token orelse return "void";
-        
+
         // primitive type
         if (convertToCType(tok.token_type)) |prim| {
             // handle pointers *T -> prim*
             if (node.left != null) {
-                 const inner = try nodeToCType(allocator, node.left.?);
-                 if (tok.token_type == TokenType.Star) {
-                     return try std.fmt.allocPrint(allocator.*, "{s}*", .{inner});
-                 }
-                 // for now handle !T or ?T as just T
-                 return inner;
+                const inner = try nodeToCType(allocator, node.left.?);
+                if (tok.token_type == TokenType.Star) {
+                    return try std.fmt.allocPrint(allocator.*, "{s}*", .{inner});
+                }
+                // for now handle !T or ?T as just T
+                return inner;
             }
             return prim;
         }
-        
+
         // identifier type like State, NetErr
         if (tok.token_type == TokenType.Identifier) {
             return tok.value;
@@ -71,16 +71,15 @@ pub fn nodeToCType(allocator: *Allocator, node: *ASTNode) ![]const u8 {
             // We'll output `void*` or the value for simplicity.
             return "void*";
         }
-        
+
         // user-defined struct/enum pointer: *State
         if (tok.token_type == TokenType.Star and node.left != null) {
-             const inner = try nodeToCType(allocator, node.left.?);
-             return try std.fmt.allocPrint(allocator.*, "{s}*", .{inner});
+            const inner = try nodeToCType(allocator, node.left.?);
+            return try std.fmt.allocPrint(allocator.*, "{s}*", .{inner});
         }
-        
+
         return tok.value;
     }
-    
+
     return "void";
 }
-

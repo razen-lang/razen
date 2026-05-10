@@ -22,7 +22,7 @@ pub fn processAssignment(allocator: *Allocator, data: *ConvertData, node: *ASTNo
     }
 
     const target = try c_expr.printExpression(allocator, data, node.left.?);
-    
+
     if (node.right == null) {
         try data.appendCodeFmt(allocator, "{s} {s};", .{ target, node.token.?.value });
     } else {

@@ -33,7 +33,7 @@ pub fn processStruct(allocator: *Allocator, data: *ConvertData, node: *ASTNode) 
                 const c_type_text = c_utils.nodeToCType(allocator, member_node.left.?) catch return ConvertError.Invalid_Var_Type;
                 try data.appendCodeFmt(allocator, "\t{s} {s};\n", .{ c_type_text, var_name });
             } else if (member_node.node_type == ASTNodeType.FunctionDeclaration) {
-                // Inline functions/methods — we ignore them in the struct layout in C, 
+                // Inline functions/methods — we ignore them in the struct layout in C,
                 // but we could emit them as function pointers if requested.
                 // For a flat struct, we just skip it.
             }
@@ -69,11 +69,11 @@ pub fn processBehave(allocator: *Allocator, data: *ConvertData, node: *ASTNode) 
                 const func_name = member_node.token.?.value;
                 var ret_type: []const u8 = "void";
                 if (member_node.left != null and member_node.left.?.left != null) {
-                     ret_type = c_utils.nodeToCType(allocator, member_node.left.?.left.?) catch "void";
+                    ret_type = c_utils.nodeToCType(allocator, member_node.left.?.left.?) catch "void";
                 }
-                
+
                 try data.appendCodeFmt(allocator, "\t{s} (*{s})(", .{ ret_type, func_name });
-                
+
                 // parameters
                 if (member_node.middle != null and member_node.middle.?.children != null) {
                     const params = member_node.middle.?.children.?.items;
@@ -89,7 +89,7 @@ pub fn processBehave(allocator: *Allocator, data: *ConvertData, node: *ASTNode) 
                 } else {
                     try data.appendCode(allocator, "void");
                 }
-                
+
                 try data.appendCode(allocator, ");\n");
             }
         }

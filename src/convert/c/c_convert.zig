@@ -39,7 +39,7 @@ pub fn convert(allocator: *Allocator, ast_nodes: *ArrayList(*ASTNode), source: [
 
     while (data.node_index < ast_nodes.items.len) {
         const pre_index = data.node_index;
-        
+
         try processGlobalNode(allocator, &data);
 
         // Nudge forward if we didn't advance
@@ -83,25 +83,25 @@ fn processGlobalNode(allocator: *Allocator, data: *ConvertData) ConvertError!voi
         ASTNodeType.UnionDeclaration => try c_unions.processUnion(allocator, data, node.?),
         ASTNodeType.ExtDeclaration => try c_function.processFunctionDeclaration(allocator, data, node.?),
         ASTNodeType.ModuleDeclaration => {
-             // C doesn't have modules, we'll emit a comment
-             try data.appendCodeFmt(allocator, "// Module {s}\n", .{ node.?.token.?.value });
+            // C doesn't have modules, we'll emit a comment
+            try data.appendCodeFmt(allocator, "// Module {s}\n", .{node.?.token.?.value});
         },
         ASTNodeType.UseDeclaration => {
-             // use std.io -> #include <std.io.h> 
-             // In a real compiler we'd resolve headers, here we just emit what it says
-             const path = node.?.token.?.value;
-             try data.appendCodeFmt(allocator, "#include \"{s}.h\"\n", .{ path });
+            // use std.io -> #include <std.io.h>
+            // In a real compiler we'd resolve headers, here we just emit what it says
+            const path = node.?.token.?.value;
+            try data.appendCodeFmt(allocator, "#include \"{s}.h\"\n", .{path});
         },
         ASTNodeType.TypeAliasDeclaration => {
-             // type Flags = u32
-             if (node.?.left != null) {
-                 const c_utils = @import("c_utils.zig");
-                 const base_type = c_utils.nodeToCType(allocator, node.?.left.?) catch "void";
-                 try data.appendCodeFmt(allocator, "typedef {s} {s};\n", .{ base_type, node.?.token.?.value });
-             }
+            // type Flags = u32
+            if (node.?.left != null) {
+                const c_utils = @import("c_utils.zig");
+                const base_type = c_utils.nodeToCType(allocator, node.?.left.?) catch "void";
+                try data.appendCodeFmt(allocator, "typedef {s} {s};\n", .{ base_type, node.?.token.?.value });
+            }
         },
         else => {
             // @TODO implementation for other globals
-        }
+        },
     }
 }

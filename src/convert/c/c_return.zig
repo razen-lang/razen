@@ -29,5 +29,5 @@ pub fn processReturn(allocator: *Allocator, data: *ConvertData, node: *ASTNode) 
     }
 
     const value = try c_expr.printExpression(allocator, data, node.left.?);
-    try data.appendCodeFmt(allocator, "return {s};\n", .{ value });
+    try data.appendCodeFmt(allocator, "return {s};\n", .{value});
 }

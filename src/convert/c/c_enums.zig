@@ -25,14 +25,14 @@ pub fn processEnum(allocator: *Allocator, data: *ConvertData, node: *ASTNode) Co
             if (member_node.node_type == ASTNodeType.EnumField) {
                 const var_name = member_node.token.?.value;
                 try data.appendCodeFmt(allocator, "\t{s}_{s}", .{ enum_name, var_name });
-                
+
                 // if it has a specific value assigned  = 200
                 if (member_node.right != null) {
                     if (member_node.right.?.node_type == ASTNodeType.IntegerLiteral) {
-                        try data.appendCodeFmt(allocator, " = {s}", .{ member_node.right.?.token.?.value });
+                        try data.appendCodeFmt(allocator, " = {s}", .{member_node.right.?.token.?.value});
                     }
                 }
-                
+
                 if (i < node.children.?.items.len - 1) {
                     try data.appendCode(allocator, ",\n");
                 } else {
@@ -59,7 +59,7 @@ pub fn processErrorDecl(allocator: *Allocator, data: *ConvertData, node: *ASTNod
             if (member_node.node_type == ASTNodeType.ErrorField) {
                 const var_name = member_node.token.?.value;
                 try data.appendCodeFmt(allocator, "\t{s}_{s}", .{ err_name, var_name });
-                
+
                 if (i < node.children.?.items.len - 1) {
                     try data.appendCode(allocator, ",\n");
                 } else {

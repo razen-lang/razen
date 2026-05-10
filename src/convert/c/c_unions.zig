@@ -16,7 +16,7 @@ pub fn processUnion(allocator: *Allocator, data: *ConvertData, node: *ASTNode) C
     if (node.token == null) return ConvertError.Node_Is_Null;
     const union_name = node.token.?.value;
 
-    // Razen Unions (NetErr) act like tagged unions. 
+    // Razen Unions (NetErr) act like tagged unions.
     // We can emit a C union of structs for now.
     try data.appendCodeFmt(allocator, "typedef union {{\n", .{});
 
@@ -24,7 +24,7 @@ pub fn processUnion(allocator: *Allocator, data: *ConvertData, node: *ASTNode) C
         for (node.children.?.items) |member_node| {
             if (member_node.node_type == ASTNodeType.UnionField) {
                 const var_name = member_node.token.?.value;
-                
+
                 if (member_node.left != null) {
                     // Record style `Code: i32` or Tuple style `Code(i32)` -> left is the Type
                     const c_type_text = c_utils.nodeToCType(allocator, member_node.left.?) catch return ConvertError.Invalid_Var_Type;

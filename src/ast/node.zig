@@ -44,7 +44,7 @@ pub const ASTNodeType = enum {
     ExtDeclaration,
     // @Annotation
     Annotation,
-    
+
     // func name(params) -> ret_type { body }
     FunctionDeclaration,
     // a single function parameter  name: type

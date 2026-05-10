@@ -102,7 +102,7 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             n.node_type = ASTNodeType.ArrayLiteral;
             n.token = tok;
             n.children = try ast_utils.createChildList(allocator);
-            
+
             while (ast_data.hasMore()) {
                 const cur: Token = try ast_data.getToken();
                 if (cur.token_type == TokenType.RightBracket) {
@@ -121,7 +121,7 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             return n;
         },
 
-// ── annotation / builtin @name ──────────────────────────────────────────
+        // ── annotation / builtin @name ──────────────────────────────────────────
         TokenType.At => {
             ast_data.advance();
             const name_tok = try ast_data.getToken();
@@ -205,47 +205,47 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             ast_data.advance(); // |
             const cap_tok = try ast_data.getToken();
             if (cap_tok.token_type != TokenType.Identifier) {
-                 ast_data.error_detail = "Expected identifier in capture block";
-                 return AstError.Unexpected_Type;
+                ast_data.error_detail = "Expected identifier in capture block";
+                return AstError.Unexpected_Type;
             }
             ast_data.advance();
             const end_or = try ast_data.getToken();
             if (end_or.token_type != TokenType.Or) {
-                 ast_data.error_detail = "Expected closing '|' for capture block";
-                 return AstError.Unexpected_Type;
+                ast_data.error_detail = "Expected closing '|' for capture block";
+                return AstError.Unexpected_Type;
             }
             ast_data.advance();
 
             var body_expr: ?*ASTNode = null;
             const maybe_brac = try ast_data.getToken();
             if (maybe_brac.token_type == TokenType.LeftBrace) {
-                 ast_data.advance(); // {
+                ast_data.advance(); // {
 
-                 const b_n = try ast_utils.createDefaultAstNode(allocator);
-                 b_n.node_type = ASTNodeType.Block;
-                 b_n.children = try ast_utils.createChildList(allocator);
-                 while(ast_data.hasMore()) {
-                      const cur_t = try ast_data.getToken();
-                      if (cur_t.token_type == TokenType.RightBrace) {
-                           ast_data.advance(); // }
-                           break;
-                      }
-                      if (cur_t.token_type == TokenType.Ret) {
-                           ast_data.advance(); // ret
-                           const ret_expr = try parseBinaryExpr(allocator, ast_data, 0);
-                           const ret_n = try ast_utils.createDefaultAstNode(allocator);
-                           ret_n.node_type = ASTNodeType.ReturnStatement;
-                           ret_n.token = cur_t;
-                           ret_n.right = ret_expr;
-                           b_n.children.?.append(allocator.*, ret_n) catch return AstError.Out_Of_Memory;
-                      } else {
-                           const expr_n = try parseBinaryExpr(allocator, ast_data, 0);
-                           if (expr_n) |en| b_n.children.?.append(allocator.*, en) catch return AstError.Out_Of_Memory;
-                      }
-                 }
-                 body_expr = b_n;
+                const b_n = try ast_utils.createDefaultAstNode(allocator);
+                b_n.node_type = ASTNodeType.Block;
+                b_n.children = try ast_utils.createChildList(allocator);
+                while (ast_data.hasMore()) {
+                    const cur_t = try ast_data.getToken();
+                    if (cur_t.token_type == TokenType.RightBrace) {
+                        ast_data.advance(); // }
+                        break;
+                    }
+                    if (cur_t.token_type == TokenType.Ret) {
+                        ast_data.advance(); // ret
+                        const ret_expr = try parseBinaryExpr(allocator, ast_data, 0);
+                        const ret_n = try ast_utils.createDefaultAstNode(allocator);
+                        ret_n.node_type = ASTNodeType.ReturnStatement;
+                        ret_n.token = cur_t;
+                        ret_n.right = ret_expr;
+                        b_n.children.?.append(allocator.*, ret_n) catch return AstError.Out_Of_Memory;
+                    } else {
+                        const expr_n = try parseBinaryExpr(allocator, ast_data, 0);
+                        if (expr_n) |en| b_n.children.?.append(allocator.*, en) catch return AstError.Out_Of_Memory;
+                    }
+                }
+                body_expr = b_n;
             } else {
-                 body_expr = try parseBinaryExpr(allocator, ast_data, 0);
+                body_expr = try parseBinaryExpr(allocator, ast_data, 0);
             }
 
             const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);

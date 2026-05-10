@@ -198,18 +198,18 @@ pub fn isAssignmentOperator(tt: TokenType) bool {
 //
 pub fn getPrecedence(tt: TokenType) usize {
     return switch (tt) {
-        TokenType.Catch  => 1,
-        TokenType.OrOr   => 2,
+        TokenType.Catch => 1,
+        TokenType.OrOr => 2,
         TokenType.AndAnd => 3,
         TokenType.EqualsEquals, TokenType.NotEquals => 4,
         TokenType.LessThan, TokenType.LessThanEquals, TokenType.GreaterThan, TokenType.GreaterThanEquals => 5,
-        TokenType.Or     => 6,
-        TokenType.Caret  => 6,
-        TokenType.And    => 7,
+        TokenType.Or => 6,
+        TokenType.Caret => 6,
+        TokenType.And => 7,
         TokenType.ShiftLeft, TokenType.ShiftRight => 8,
         TokenType.Plus, TokenType.Minus => 9,
         TokenType.Star, TokenType.Slash, TokenType.Percent => 10,
-        TokenType.Dot   => 12, // member access binds tightest of all binary ops
+        TokenType.Dot => 12, // member access binds tightest of all binary ops
         else => 0,
     };
 }

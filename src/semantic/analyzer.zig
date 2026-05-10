@@ -17,18 +17,18 @@ pub const Analyzer = struct {
     allocator: *Allocator,
     sym_table: SymbolTable,
     has_errors: bool = false,
-    
+
     pub fn init(allocator: *Allocator) !Analyzer {
         return Analyzer{
             .allocator = allocator,
             .sym_table = try SymbolTable.init(allocator),
         };
     }
-    
+
     pub fn deinit(self: *Analyzer) void {
         self.sym_table.deinit();
     }
-    
+
     fn reportError(self: *Analyzer, token: lexer.Token, comptime msg: []const u8, args: anytype) void {
         self.has_errors = true;
         print("\n{s}Semantic Error:{s} line {}\n  ", .{ lexer.RED, lexer.RESET, token.line });
@@ -41,20 +41,20 @@ pub const Analyzer = struct {
         for (ast_nodes.items) |node| {
             try self.declareGlobal(node);
         }
-        
+
         // Pass 2: Analyze bodies
         for (ast_nodes.items) |node| {
             try self.analyzeNode(node);
         }
     }
-    
+
     fn declareGlobal(self: *Analyzer, node: *ASTNode) !void {
         if (node.token == null) return;
-        
+
         const name = node.token.?.value;
         var sym_type = SymbolType.Variable;
         var param_count: usize = 0;
-        
+
         switch (node.node_type) {
             ASTNodeType.FunctionDeclaration, ASTNodeType.ExtDeclaration => {
                 sym_type = SymbolType.Function;
@@ -68,24 +68,24 @@ pub const Analyzer = struct {
             ASTNodeType.BehaveDeclaration => sym_type = SymbolType.Trait,
             else => return, // Only tracking globals here
         }
-        
+
         const sym = Symbol{
             .name = name,
             .symbol_type = sym_type,
             .param_count = param_count,
             .token = node.token.?,
         };
-        
+
         if (!self.sym_table.define(sym)) {
-            self.reportError(node.token.?, "Global '{s}' is already declared.", .{ name });
+            self.reportError(node.token.?, "Global '{s}' is already declared.", .{name});
         }
     }
-    
+
     fn analyzeNode(self: *Analyzer, node: *ASTNode) !void {
         switch (node.node_type) {
             ASTNodeType.FunctionDeclaration => {
                 try self.sym_table.pushScope();
-                
+
                 // Add parameters to scope
                 if (node.middle != null and node.middle.?.children != null) {
                     for (node.middle.?.children.?.items) |param_node| {
@@ -97,17 +97,17 @@ pub const Analyzer = struct {
                                 .token = tok,
                             };
                             if (!self.sym_table.define(p_sym)) {
-                                self.reportError(tok, "Parameter '{s}' is already declared.", .{ tok.value });
+                                self.reportError(tok, "Parameter '{s}' is already declared.", .{tok.value});
                             }
                         }
                     }
                 }
-                
+
                 // Analyze body
                 if (node.right != null) {
                     try self.analyzeNode(node.right.?);
                 }
-                
+
                 self.sym_table.popScope();
             },
             ASTNodeType.Block, ASTNodeType.IfBody, ASTNodeType.ElseBody, ASTNodeType.LoopBody, ASTNodeType.MatchBody => {
@@ -127,7 +127,7 @@ pub const Analyzer = struct {
                 if (node.right != null) {
                     try self.analyzeNode(node.right.?);
                 }
-                
+
                 if (node.token) |tok| {
                     const is_mut = node.is_mut;
                     const sym = Symbol{
@@ -137,7 +137,7 @@ pub const Analyzer = struct {
                         .token = tok,
                     };
                     if (!self.sym_table.define(sym)) {
-                        self.reportError(tok, "Variable '{s}' is already declared in this scope.", .{ tok.value });
+                        self.reportError(tok, "Variable '{s}' is already declared in this scope.", .{tok.value});
                     }
                 }
             },
@@ -147,14 +147,14 @@ pub const Analyzer = struct {
                     if (node.left.?.token) |tok| {
                         if (self.sym_table.resolve(tok.value)) |sym| {
                             if (!sym.is_mut) {
-                                self.reportError(tok, "Cannot reassign to constant '{s}'. Use 'mut' to make it mutable.", .{ tok.value });
+                                self.reportError(tok, "Cannot reassign to constant '{s}'. Use 'mut' to make it mutable.", .{tok.value});
                             }
                         } else {
-                            self.reportError(tok, "Use of undeclared variable '{s}'.", .{ tok.value });
+                            self.reportError(tok, "Use of undeclared variable '{s}'.", .{tok.value});
                         }
                     }
                 }
-                
+
                 if (node.right != null) {
                     try self.analyzeNode(node.right.?);
                 }
@@ -166,7 +166,7 @@ pub const Analyzer = struct {
                         // unless it looks like a standard variable. We will just check if it's missing.
                         // Let's implement a whitelist for now or just report it.
                         if (!std.mem.eql(u8, tok.value, "std") and !std.mem.eql(u8, tok.value, "self")) {
-                            self.reportError(tok, "Use of undeclared identifier '{s}'.", .{ tok.value });
+                            self.reportError(tok, "Use of undeclared identifier '{s}'.", .{tok.value});
                         }
                     }
                 }
@@ -185,7 +185,7 @@ pub const Analyzer = struct {
                         }
                     }
                 }
-                
+
                 // analyze args
                 if (node.children != null) {
                     for (node.children.?.items) |arg| {
@@ -233,7 +233,7 @@ pub const Analyzer = struct {
             },
             else => {
                 // Ignore types, strings, etc.
-            }
+            },
         }
     }
 };

@@ -15,4 +15,4 @@ pub const SEMANTIC_ERROR_PROGRAM =
     \\    ret
     \\}
     \\
-    ;
+;
