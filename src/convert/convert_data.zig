@@ -46,7 +46,13 @@ pub const ConvertData = struct {
     error_function: ?[]const u8 = null,
     last_statement_was_return: bool = false,
 
-    // grabs the next AST node to convert
+    // Bug 4: track declared variable types for type inference
+    var_types: std.StringHashMap([]const u8),
+    // Bug 7: collect deferred statements, emit before each return and at end of function
+    deferred_stmts: std.ArrayList(*ASTNode),
+    // Bug 9: counter for fresh temporary variable names
+    tmp_counter: usize = 0,
+
     pub fn getNode(self: *ConvertData) ?*ASTNode {
         if (self.node_index >= self.ast_nodes.items.len) {
             return null;
@@ -54,7 +60,6 @@ pub const ConvertData = struct {
         return self.ast_nodes.items[self.node_index];
     }
 
-    // grab with increment
     pub fn getNextNode(self: *ConvertData) ?*ASTNode {
         self.node_index += 1;
         if (self.node_index >= self.ast_nodes.items.len) {
@@ -90,5 +95,17 @@ pub const ConvertData = struct {
 
     pub fn appendCodeFmt(self: *ConvertData, allocator: *Allocator, comptime fmt: []const u8, args: anytype) ConvertError!void {
         self.generated_code.appendFmt(allocator, fmt, args) catch return ConvertError.Out_Of_Memory;
+    }
+
+    // Bug 4: look up a previously declared variable's C type
+    pub fn lookupVarType(self: *ConvertData, name: []const u8) ?[]const u8 {
+        return self.var_types.get(name);
+    }
+
+    // Bug 9: generate a unique temporary variable name (_tmp0, _tmp1, ...)
+    pub fn freshTmpName(self: *ConvertData, allocator: *Allocator) ConvertError![]u8 {
+        const name = std.fmt.allocPrint(allocator.*, "_tmp{d}", .{self.tmp_counter}) catch return ConvertError.Out_Of_Memory;
+        self.tmp_counter += 1;
+        return name;
     }
 };

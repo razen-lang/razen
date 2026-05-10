@@ -20,14 +20,30 @@ pub fn processFunctionDeclaration(allocator: *Allocator, data: *ConvertData, nod
 
     const func_name = node.token.?.value;
     const is_main = std.mem.eql(u8, func_name, "main");
+    // Bug 6: detect ext func (routed as ExtDeclaration from c_convert)
+    const is_ext = node.node_type == ASTNodeType.ExtDeclaration;
 
     var return_type: []const u8 = "void";
     if (node.left != null and node.left.?.left != null) {
         return_type = c_utils.nodeToCType(allocator, node.left.?.left.?) catch "void";
     }
-    // After getting return_type, force main to use "int"
+    // Bug 1: force main() return type to int (already present, kept for safety)
     if (is_main) {
         return_type = "int";
+    }
+
+    // Bug 2: blank line before every function for readability
+    try data.appendCode(allocator, "\n");
+
+    // Bug 6: extern declaration — emit prototype only, no body
+    if (is_ext) {
+        try data.appendCodeFmt(allocator, "extern {s} {s}(", .{ return_type, func_name });
+        if (node.middle != null) {
+            try processParameters(allocator, data, node.middle.?);
+        }
+        try data.appendCode(allocator, ");\n");
+        data.node_index += 1;
+        return;
     }
 
     try data.appendCodeFmt(allocator, "{s} {s}(", .{ return_type, func_name });
@@ -39,9 +55,16 @@ pub fn processFunctionDeclaration(allocator: *Allocator, data: *ConvertData, nod
     try data.appendCode(allocator, ") {\n");
     data.incrementIndexCount();
 
+    // Bug 7: clear deferred list at the start of each new function
+    data.deferred_stmts.clearRetainingCapacity();
+
     if (node.right != null) {
         try c_body.processBody(allocator, data, node.right.?);
     }
+
+    // Bug 7: emit any remaining defers at end of function body (LIFO)
+    try emitDeferredStatements(allocator, data);
+    data.deferred_stmts.clearRetainingCapacity();
 
     if (is_main and !data.last_statement_was_return) {
         try data.addTab(allocator);
@@ -49,7 +72,19 @@ pub fn processFunctionDeclaration(allocator: *Allocator, data: *ConvertData, nod
     }
 
     data.decrementIndexCount();
-    try data.appendCode(allocator, "}\n\n");
+    try data.appendCode(allocator, "}\n");
+    data.node_index += 1;
+}
+
+/// Bug 7: emit deferred statements in reverse (LIFO) order.
+/// Called both at end-of-function and before every return.
+pub fn emitDeferredStatements(allocator: *Allocator, data: *ConvertData) ConvertError!void {
+    if (data.deferred_stmts.items.len == 0) return;
+    var i = data.deferred_stmts.items.len;
+    while (i > 0) {
+        i -= 1;
+        try c_body.processStatement(allocator, data, data.deferred_stmts.items[i]);
+    }
 }
 
 fn processParameters(allocator: *Allocator, data: *ConvertData, params_node: *ASTNode) ConvertError!void {
