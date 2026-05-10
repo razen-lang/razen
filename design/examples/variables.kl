@@ -1,0 +1,73 @@
+// Variables and Constants
+
+/// Syntax
+
+/// 1. Immutable Variable
+/// -> Cannot be reassigned.
+variable_name := value // infered type
+variable_name : type = value // explicit type
+
+/// 2. Mutable Variable
+/// -> A variable whose value can change.
+mut variable_name := value // infered type
+mut variable_name : type = value // explicit type
+
+/// 3. Immutable Comp-time Constant : Global Const
+const VARIABLE_NAME : type = value // must explicit type
+
+/// 4. Mutable Comp-time Constant : Global Const
+/// -> Mutable compile-time variable.
+/// -> Exists only during compilation.
+const mut VARIABLE_NAME : type = value // must explicit type
+
+// Main Categories
+// -> Variables & Constants can include values/types:
+// Primitive types
+// Compound types
+// Collections
+// References
+// Smart pointers
+// Functions
+// Structs
+// Enums
+// Behaviours
+// Generics
+// Async/Futures : Future
+// Raw pointers
+// Special types
+
+/// 1. Integer Types
+/// -> Signed Ints
+/// int -> i32 (int type defaults to i32)
+/// iN (razen allows N => 1..=32768)
+/// i1 -> i32768
+/// isize -> auto sets size
+
+a : i32 = 10;
+const B : i64 = 100;
+
+/// Unsigned Ints
+/// uint -> u32 (unt type defaults to u32)
+/// uN (razen allows N => 1..=32768)
+/// u1 -> u32768
+/// usize -> auto sets size
+
+size : usize = 1024;
+
+/// 2. Floating Point Types
+/// float -> f32 (defaults to f32)
+/// f32, f64, f128
+
+pi : f64 = 3.14159
+
+/// 3. Boolean
+is_ready : bool = true
+
+/// 4. Character
+/// -> Single Unicode scalar.
+
+ch : char = 'A'
+
+/// 5. String Types
+
+name : str = "Prathmesh"  // immutable string

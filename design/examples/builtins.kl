@@ -1,0 +1,121 @@
+// Helpers from Compiler
+
+@Self
+@Generic
+@TypeOf
+@SizeOf
+@AlignOf
+@Dyn
+@Type
+
+// Allocators
+
+@page
+@arena
+@fixed
+@stack
+@pool
+@c
+@debug
+@failing
+@log
+@thread_local
+@gpa
+
+// 1. @page
+/// Methods:
+alloc()
+free()
+resize()
+
+// 2. @arena
+/// Methods:
+alloc()
+free()
+resize()
+allocator()
+reset()
+state()
+restore()
+promote()
+deinit()
+
+// 3. @fixed
+/// Methods:
+alloc()
+free()
+resize()
+allocator()
+used()
+available()
+reset()
+
+// 4. @stack(N)
+/// Methods:
+alloc()
+free()
+resize()
+allocator()
+used_fallback()
+
+// 5. @pool(T, N)
+/// Methods:
+alloc()
+free()
+resize()
+allocator()
+create()
+destroy()
+capacity()
+used()
+clear()
+
+// 6. @c
+/// Methods:
+alloc()
+free()
+resize()
+
+// 7. @debug(parent)
+/// Methods:
+alloc()
+free()
+resize()
+allocator()
+check_leaks()
+query_ptr()
+deinit()
+
+// 8. failing(rate, parent)
+/// Methods:
+alloc()
+free()
+resize()
+allocator()
+reset_count()
+
+// 9. @log(parent)
+/// Methods:
+alloc()
+free()
+resize()
+allocator()
+stats()
+reset_stats()
+print_stats()
+deinit()
+
+// 10. @thread_local
+/// Methods:
+alloc()
+free()
+resize()
+
+// 11. @gpa : future
+/// Methods:
+alloc()
+free()
+resize()
+collect_stats()
+trim()
+deinit()

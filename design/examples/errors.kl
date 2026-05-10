@@ -1,0 +1,26 @@
+// error
+/// Supports: 
+///     Named error variants
+///     Error sets
+///     Error unions
+///     Error propagation
+///     Pattern matching
+///     Typed errors
+///     Error returning functions
+///     Multiple error types
+
+
+// Simple Error Set
+error FileError {
+    NotFound,
+    PermissionDenied,
+    InvalidPath,
+}
+
+/// Usage:
+ret FileError.NotFound
+
+// Error Union Return Type
+func read_file(path: str) -> FileError!str 
+
+/// Meaning: returns str or FileError

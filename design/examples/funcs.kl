@@ -1,0 +1,100 @@
+// Functions
+
+/// General Syntax
+func function_name(parameters) -> return_type {
+    // code
+}
+
+/// Example:
+func add(a: int, b: int) -> int {
+    ret a + b
+}
+
+// 1. Simple Function
+// -> No parameters, no return value.
+func hello() -> void {
+    fmt.println("Hello", .{})
+}
+
+// 2. Function with Parameters
+// -> Takes input values.
+func greet(name: str) -> void {
+    fmt.println("Hello {}", .{name})
+}
+
+/// Usage
+greet("Prathmesh")
+
+// 3. Function with Return Value
+// -> Returns data:
+
+func square(x: int) -> int {
+    ret x * x
+}
+
+/// Usage:
+result := square(4)
+
+// 4. Multiple Parameters
+func add(a: int, b: int) -> int {
+    ret a + b
+}
+
+// 5. Void Functions
+// -> Functions returning nothing.
+func print_msg() -> void {
+    fmt.println("Message", .{})
+}
+
+// 6. Recursive Functions
+// -> Functions calling themselves.
+// -> Example: factorial.
+func factorial(n: int) -> int {
+    if n == 0 {
+        ret 1
+    } else {
+        ret n * factorial(n - 1)
+    }
+}
+
+// 7. Generic Functions
+/// -> Work with multiple types.
+func indentity(const T: @Type, value: T) -> T {
+    ret value
+}
+
+/// Using Built-in Generic:
+@Generic(T) func identity(value: T) -> T {
+    ret value
+}
+
+/// Usage:
+indentity(5)
+indentity("Hello")
+
+// 8. Higher-Order Functions : Future
+/// -> Functions taking other functions.
+func apply(f: func(int) -> int, x: int) -> int {
+    ret func(x)
+}
+
+// 9. Const Functions
+/// -> Can run at compile time.
+const func double(x: int) -> int {
+    ret x * 2
+}
+
+// 10. Async Functions : Future
+/// -> Used for concurrency/networking.
+async func fetch_data() -> void {
+    fmt.println("Fetching")
+}
+
+// 11. External Functions
+/// -> External Function likes C
+ext func printf(fmt: str, ...) -> int
+
+/// Usage:
+pub func main() -> void {
+    _ := printf("Hi!")
+}

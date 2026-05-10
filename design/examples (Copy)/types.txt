@@ -1,0 +1,36 @@
+// Types
+
+// Numeric
+i1, i2, i4, i8, i16, i32, i64, i128, isize, int = i32
+u1, u2, u4, u8, u16, u32, u64, u128, usize, uint = u32
+f32, f64, f128, float = f32
+
+// Other scalar
+bool, char
+
+// Special
+void = zero sized, noret, any
+
+// Memory & optinal
+&T // reference creator
+*T // pointer/reference type
+ptr.* // derefenrence
+!T // type can fail
+?T // may not exist : Optinal
+Error!T // Error or Type : if error
+
+// Sequence Types
+str // str = UTF-8 bytes
+string // heap
+[T] // can fail or may not exist so `!`, `&`, `mut &` and `?`  can used
+[T; N] // can explicit length
+vec[T] // can fail or may not exist so `!`, `&`, `mut &` and `?`  can used
+map{K, V} // can fail or may not exist so `!`, `&`, `mut &` and `?`  can used
+set{T} // can fail or may not exist so `!`, `&`, `mut &` and `?`  can used
+
+// Compound
+tuple -> (T, ..., T)
+enum // unit, tagged, structs, 
+union
+error // enum but only error-enum
+struct // structure of data

@@ -1,0 +1,97 @@
+use std.fmt
+
+// 1. Unit Enums
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+/// Usage
+c := Color.Red
+
+// 2. Tagged Union Enums / Tuple Enums
+union Message {
+    Text(str),
+    Number(int), // int defauls to i32
+}
+
+/// Usage
+msg := Message.Text("Hello")
+
+/// Access with match
+match msg {
+    Message.Text(text) => fmt.println("{}", .{text}),
+    Message.Number(n)  => fmt.println("{}", .{n}),
+}
+
+// 3. Struct Enums
+
+enum Shape {
+    Circle { radius: float }, // float defaults to f32
+    Rectangle { width: float, height: float },
+}
+
+/// Usage
+s := Shape.Circle { radius: 10.0 }
+
+// Pattern Matching
+
+match s {
+    Shape.Circle { radius } => {
+        fmt.println("Radius: {}", .{radius})
+    },
+    Shape.Rectangle { width, height } => {
+        fmt.println("{} {}", .{ width, height })
+    },
+}
+
+// 4. Mixed Enums
+
+enum Data {
+    Empty,
+    Integer(int),
+    User { name: str, age: u8 },
+}
+
+// Enum with Implementation
+enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+
+    func as_str(d: &Direction) -> str {
+        match d {
+            Direction.Up => ret "Up",
+            Direction.Down => ret "Down",
+            Direction.Left => ret "Left",
+            Direction.Right => ret "Right",
+        }
+    }
+}
+
+/// Usage
+d := Direction.Left
+fmt.println("{}", .{d.as_str()})
+
+// Enums with Custom Behaviour
+behave Describe {
+    func describe(a: @Self) -> void
+}
+
+enum Animal ~> Describe {
+    Dog,
+    Cat,
+
+    describe(a: &Animal) -> void {
+        match a {
+            Animal.Dog => fmt.println("This is a dog"),
+            Animal.Cat => fmt.println("This is a cat"),
+        }
+    }
+}
+
+/// Usage
+a := Animal.Dog
+a.describe()

@@ -1,0 +1,50 @@
+// enum
+/// Supports: 
+///     Simple named variants
+///     Integer backing Types
+///     Explicit discriminant values
+///     Flags/bit masks
+///     Pattern Matching
+///     Comparisons
+///     Compile-time Usage
+
+// Simple Enums
+enum Color {
+    Red,
+    Green,
+    Blue,
+}
+
+/// Usage:
+c := Color.Red
+
+if c == Color.Red {
+    fmt.println("red")
+}
+
+// Enum with Integer Type
+enum HttpStatus: u16 {
+    Ok = 200,
+    NotFound = 400,
+    ServerError = 500,
+}
+
+/// Usage:
+code := HttpStatus.NotFound
+
+// Bit Flags Enum
+enum Permission: u8 {
+    Read = 1 << 0,
+    Write = 1 << 1,
+    Exec = 1 << 2,
+}
+
+/// Usage:
+perms := Permission.Red | Permission.Write
+
+// Pattern Matching
+match color {
+    Color.Red => fmt.println("red"),
+    Color.Green => fmt.println("green"),
+    Color.Blue => fmt.println("blue"),
+}

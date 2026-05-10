@@ -1,0 +1,42 @@
+use std.fmt
+
+behave Printable {
+    func greet(p: @Self) -> void
+}
+
+@Dyn behave Dog {
+    needs voice: str        // simple field, just needs to exist
+
+    func set_handshake(a: mut @Self) -> void  // required method, struct decides how
+    func speak(a: @Self) -> void {
+        fmt.println("{}", .{a.voice})   // safe, voice declared in needs
+    }
+    func handshake(mut a: @Self) -> void {
+        a.set_handshake()               // safe, method declared above
+    }
+}
+behave Cat {
+    func speak(a: @Self) -> void {
+        fmt.println("{}", .{a.voice})
+    }
+}
+
+@Generic(T) struct Person ~> Printable {
+    name: str,
+    age: int,
+
+    greet(p: &Person) -> void {
+        fmt.println("Hi, {}", .{p.name})
+    }
+}
+
+struct Animal ~> Dog, Cat {
+    name: str,
+    type: str,
+    voice: str,
+    handshake: bool,
+
+    func dog_speak ~> Dog.speak(a: &Animal)
+    func cat_speak ~> Cat.speak(a: &Animal) // can use be rename function
+    handshake(a: &Animal)
+}

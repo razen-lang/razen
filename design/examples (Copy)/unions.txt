@@ -1,0 +1,88 @@
+// union
+/// Supports: 
+///     Tagged unions
+///     Untagged unions
+///     Unit variants
+///     Tuple variants
+///     Struct variants
+///     Recursive variants
+///     Payload variants
+///     Pattern matching
+///     Nested unions
+///     Mixed variant styles
+
+// Unit variant
+union State {
+    Idle,
+    Running,
+    Stopped,
+}
+
+/// Usage:
+s := State.Running
+
+// Tuple Variant 
+union Value {
+    Int(i64),
+    Float(f64),
+    Text(str),
+}
+
+/// Usgae:
+c := Value.Int(42)
+
+// Struct Variant
+union Expr {
+    Binary {
+        left: *Expr,
+        right: *Expr,
+        op: Token,
+    },
+
+    Number(i64),
+}
+
+/// Usage:
+expr := Expr.Binary {
+    left = lhs,
+    right = rhs,
+    op = plus,
+}
+
+// Recursive Union
+union Node {
+    Value(i64),
+
+    Add {
+        left: *Node,
+        right: *Node,
+    },
+}
+
+// Mixed Variant Styles
+union Token {
+    EOF,
+    Int(i64),
+    Ident(str),
+    Span {
+        str: usize,
+        end: usize,
+    },
+}
+
+// Pattern Matching
+match value {
+    Value.Int(v) => fmt.println(v),
+    Value.Float(v) => fmt.println(v),
+    Value.Text(v) => fmt.println(v),
+}
+
+// Struct Pattern Matching
+match expr {
+    Expr.Binary { left, right, op } => {
+        fmt.println(op)
+    },
+    Expr.Number(n) => {
+        fmt.println(n)
+    },
+}
