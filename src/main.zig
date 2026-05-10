@@ -90,6 +90,6 @@ pub fn main() void {
     print("\n{s}▶ Sample: PHASE 2 EXHAUSTIVE TESTING{s}\n", .{ lexer.CYAN, lexer.RESET });
     convertCode(code_samples.PHASE_2_EXHAUSTIVE);
 
-    print("\n{s}▶ Sample: SEMANTIC ERROR TESTING{s}\n", .{ lexer.CYAN, lexer.RESET });
-    convertCode(semantic_samples.SEMANTIC_ERROR_PROGRAM);
+    // print("\n{s}▶ Sample: SEMANTIC ERROR TESTING{s}\n", .{ lexer.CYAN, lexer.RESET });
+    // convertCode(semantic_samples.SEMANTIC_ERROR_PROGRAM);
 }
