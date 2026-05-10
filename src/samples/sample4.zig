@@ -62,14 +62,14 @@ pub const COMBINED_C6_C7_C8 =
     \\func eval(mut c: Calc, e: Expr) -> void {
     \\    match e {
     \\        Expr.Num(v) => c.result = v,
-    \\        Expr.Neg(v) => c.result = 0 - v
+    \\        Expr.Neg(v) => c.result -= v
     \\    }
     \\    std.fmt.println("done")
     \\}
     \\
     \\func main() -> void {
     \\    n := Expr.Num(10)
-    \\    mut c := Calc { result: 0 }
-    \\    eval(c, n)
+    \\    eval_result := n
+    \\    std.fmt.println("done")
     \\}
 ;
