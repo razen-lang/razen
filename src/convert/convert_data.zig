@@ -7,6 +7,7 @@ const ConvertError = @import("errors.zig").ConvertError;
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 
+// A simple growable byte buffer used to accumulate the generated C source.
 pub const StringBuilder = struct {
     list: ArrayList(u8),
 
@@ -35,41 +36,48 @@ pub const StringBuilder = struct {
     }
 };
 
+// State threaded through the entire code generation pass.
+// One ConvertData lives per convert() call; all emitters share it.
 pub const ConvertData = struct {
     ast_nodes: *ArrayList(*ASTNode),
     generated_code: *StringBuilder,
     node_index: usize = 0,
     tab_count: usize = 0,
 
+    // set by emitters when they hit an error, for better diagnostics
     error_detail: ?[]const u8 = null,
     error_token: ?Token = null,
     error_function: ?[]const u8 = null,
+
     last_statement_was_return: bool = false,
 
-    // Bug 4: track declared variable types for type inference
+    // variable name -> C type, built up as declarations are emitted.
+    // used for type inference when a variable has no explicit annotation.
     var_types: std.StringHashMap([]const u8),
-    // Bug 7: collect deferred statements, emit before each return and at end of function
+
+    // deferred statement body blocks, collected during a function body walk.
+    // flushed in LIFO order before every return and at the end of the function.
     deferred_stmts: std.ArrayList(*ASTNode),
-    // Bug 9: counter for fresh temporary variable names
+
+    // monotonic counter for generating unique temporary variable names (_tmp0, _tmp1, ...)
     tmp_counter: usize = 0,
-    // C4 FIX: current struct/behave name so @Self can resolve to the correct C type
+
+    // set to the current struct/behave name while emitting its body,
+    // so that @Self in method signatures resolves to the right C type name.
     current_struct_name: ?[]const u8 = null,
-    // C6/C7 FIX: registry of union type names → their variant field names and types
-    // Key: union_name (e.g. "Value"), Value: StringHashMap of variant_name → c_type
+
+    // union name -> (variant name -> C type).
+    // populated as unions are emitted; used for tagged-union match and construction.
     union_registry: std.StringHashMap(std.StringHashMap([]const u8)),
 
     pub fn getNode(self: *ConvertData) ?*ASTNode {
-        if (self.node_index >= self.ast_nodes.items.len) {
-            return null;
-        }
+        if (self.node_index >= self.ast_nodes.items.len) return null;
         return self.ast_nodes.items[self.node_index];
     }
 
     pub fn getNextNode(self: *ConvertData) ?*ASTNode {
         self.node_index += 1;
-        if (self.node_index >= self.ast_nodes.items.len) {
-            return null;
-        }
+        if (self.node_index >= self.ast_nodes.items.len) return null;
         return self.ast_nodes.items[self.node_index];
     }
 
@@ -78,9 +86,7 @@ pub const ConvertData = struct {
     }
 
     pub fn decrementIndexCount(self: *ConvertData) void {
-        if (self.tab_count > 0) {
-            self.tab_count -= 1;
-        }
+        if (self.tab_count > 0) self.tab_count -= 1;
     }
 
     pub fn addTab(self: *ConvertData, allocator: *Allocator) ConvertError!void {
@@ -102,12 +108,11 @@ pub const ConvertData = struct {
         self.generated_code.appendFmt(allocator, fmt, args) catch return ConvertError.Out_Of_Memory;
     }
 
-    // Bug 4: look up a previously declared variable's C type
     pub fn lookupVarType(self: *ConvertData, name: []const u8) ?[]const u8 {
         return self.var_types.get(name);
     }
 
-    // Bug 9: generate a unique temporary variable name (_tmp0, _tmp1, ...)
+    // generate a fresh name like _tmp0, _tmp1, ... for try/catch expansion temps
     pub fn freshTmpName(self: *ConvertData, allocator: *Allocator) ConvertError![]u8 {
         const name = std.fmt.allocPrint(allocator.*, "_tmp{d}", .{self.tmp_counter}) catch return ConvertError.Out_Of_Memory;
         self.tmp_counter += 1;

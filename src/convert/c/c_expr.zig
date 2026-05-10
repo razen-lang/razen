@@ -10,6 +10,13 @@ const ConvertError = errors.ConvertError;
 const Allocator = std.mem.Allocator;
 const String = []const u8;
 
+/// F13 helper: check if the next argument in a list is a tuple/array literal
+fn isTupleArg(children: []*ASTNode, idx: usize) bool {
+    if (idx >= children.len) return false;
+    if (children[idx].left == null) return false;
+    return children[idx].left.?.node_type == ASTNodeType.ArrayLiteral;
+}
+
 /// printLValue: like printExpression but MemberAccess uses '.' (for assignment targets like c.value).
 /// Dot-notation (struct field access) is needed on the LHS of assignments.
 pub fn printLValue(allocator: *Allocator, data: *ConvertData, node: *ASTNode) ConvertError!String {
@@ -87,8 +94,7 @@ pub fn printExpression(allocator: *Allocator, data: *ConvertData, node: *ASTNode
                                 }
                             }
                         }
-                        return std.fmt.allocPrint(allocator.*, "({s}){{ .tag = {s}, .data = {{ .{s} = {s} }} }}",
-                            .{ union_name, tag, variant_name, payload_str.items }) catch return ConvertError.Out_Of_Memory;
+                        return std.fmt.allocPrint(allocator.*, "({s}){{ .tag = {s}, .data = {{ .{s} = {s} }} }}", .{ union_name, tag, variant_name, payload_str.items }) catch return ConvertError.Out_Of_Memory;
                     }
                 }
                 // not a known union constructor — fall through to namespace call
@@ -111,6 +117,12 @@ pub fn printExpression(allocator: *Allocator, data: *ConvertData, node: *ASTNode
                 return std.fmt.allocPrint(allocator.*, "{s}({s})", .{ func_full, args_str.items }) catch return ConvertError.Out_Of_Memory;
             }
 
+            // F16 FIX: ptr.* dereference — right token is "*"
+            if (node.right.?.token != null and std.mem.eql(u8, node.right.?.token.?.value, "*")) {
+                const ptr_expr = try printExpression(allocator, data, node.left.?);
+                return std.fmt.allocPrint(allocator.*, "(*{s})", .{ptr_expr}) catch return ConvertError.Out_Of_Memory;
+            }
+
             // plain member access: std.fmt → std_fmt, State.Open → State_Open
             const left = try printExpression(allocator, data, node.left.?);
             const right = try printExpression(allocator, data, node.right.?);
@@ -121,13 +133,31 @@ pub fn printExpression(allocator: *Allocator, data: *ConvertData, node: *ASTNode
             var args_str = std.ArrayList(u8).initCapacity(allocator.*, 0) catch return ConvertError.Out_Of_Memory;
 
             if (node.children != null) {
-                for (node.children.?.items, 0..) |child, i| {
+                const children = node.children.?.items;
+                for (children, 0..) |child, i| {
                     if (child.left != null) {
-                        const arg_val = try printExpression(allocator, data, child.left.?);
-                        args_str.appendSlice(allocator.*, arg_val) catch return ConvertError.Out_Of_Memory;
-                    }
-                    if (i < node.children.?.items.len - 1) {
-                        args_str.appendSlice(allocator.*, ", ") catch return ConvertError.Out_Of_Memory;
+                        // F13 FIX: skip tuple literal .{...} args (format arg tuples)
+                        // They get expanded inline as additional C args
+                        const is_tuple_arg = child.left.?.node_type == ASTNodeType.ArrayLiteral;
+                        if (!is_tuple_arg) {
+                            const arg_val = try printExpression(allocator, data, child.left.?);
+                            args_str.appendSlice(allocator.*, arg_val) catch return ConvertError.Out_Of_Memory;
+                            if (i < children.len - 1 and !isTupleArg(children, i + 1)) {
+                                args_str.appendSlice(allocator.*, ", ") catch return ConvertError.Out_Of_Memory;
+                            }
+                        } else {
+                            // expand tuple items as additional args
+                            if (child.left.?.children != null) {
+                                for (child.left.?.children.?.items, 0..) |telem, ti| {
+                                    const tv = try printExpression(allocator, data, telem);
+                                    if (args_str.items.len > 0) {
+                                        args_str.appendSlice(allocator.*, ", ") catch return ConvertError.Out_Of_Memory;
+                                    }
+                                    args_str.appendSlice(allocator.*, tv) catch return ConvertError.Out_Of_Memory;
+                                    _ = ti;
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -160,7 +190,6 @@ pub fn printExpression(allocator: *Allocator, data: *ConvertData, node: *ASTNode
         ASTNodeType.BuiltinExpression => {
             if (node.token == null) return ConvertError.Node_Is_Null;
             const bname = node.token.?.value;
-            // Map known builtins to our razen_core.h C versions
             if (std.mem.eql(u8, bname, "SizeOf")) {
                 if (node.children != null and node.children.?.items.len > 0) {
                     const t_arg = try printExpression(allocator, data, node.children.?.items[0]);
@@ -168,13 +197,48 @@ pub fn printExpression(allocator: *Allocator, data: *ConvertData, node: *ASTNode
                 }
                 return "sizeof(void)";
             }
-            if (std.mem.eql(u8, bname, "c") or std.mem.eql(u8, bname, "arena") or std.mem.eql(u8, bname, "page")) {
-                // Return the instance name, e.g. builtin_c_allocator
-                return std.fmt.allocPrint(allocator.*, "builtin_{s}_allocator", .{bname}) catch return ConvertError.Out_Of_Memory;
-            }
-            // fallback
-            return std.fmt.allocPrint(allocator.*, "builtin_{s}", .{bname}) catch return ConvertError.Out_Of_Memory;
+            // F12: allocator builtins — map to razen_core.h allocator stubs
+            if (std.mem.eql(u8, bname, "c")) return "razen_c_allocator()";
+            if (std.mem.eql(u8, bname, "page")) return "razen_page_allocator()";
+            if (std.mem.eql(u8, bname, "arena")) return "razen_arena_allocator()";
+            if (std.mem.eql(u8, bname, "pool")) return "razen_pool_allocator()";
+            if (std.mem.eql(u8, bname, "stack")) return "razen_stack_allocator()";
+            if (std.mem.eql(u8, bname, "fixed")) return "razen_fixed_allocator()";
+            if (std.mem.eql(u8, bname, "gpa")) return "razen_gpa_allocator()";
+            if (std.mem.eql(u8, bname, "debug")) return "razen_debug_allocator()";
+            return std.fmt.allocPrint(allocator.*, "razen_{s}()", .{bname}) catch return ConvertError.Out_Of_Memory;
         },
+
+        // F16 FIX: UnaryExpression covers -x, !x, &x (address-of), and ptr.* (deref)
+        ASTNodeType.UnaryExpression => {
+            if (node.token == null or node.left == null) return ConvertError.Node_Is_Null;
+            const operand = try printExpression(allocator, data, node.left.?);
+            const op = node.token.?.value;
+            if (std.mem.eql(u8, op, "&")) {
+                // &x → &x (address-of)
+                return std.fmt.allocPrint(allocator.*, "&{s}", .{operand}) catch return ConvertError.Out_Of_Memory;
+            }
+            if (std.mem.eql(u8, op, "*") or std.mem.eql(u8, op, ".*")) {
+                // ptr.* or *ptr → (*ptr) dereference
+                return std.fmt.allocPrint(allocator.*, "(*{s})", .{operand}) catch return ConvertError.Out_Of_Memory;
+            }
+            // -x, !x
+            return std.fmt.allocPrint(allocator.*, "{s}{s}", .{ op, operand }) catch return ConvertError.Out_Of_Memory;
+        },
+
+        // F15 FIX: StructLiteral / Annotation used for struct construction
+        // Person { name: "Ayaan", age: 22 } → (Person){ .name = "Ayaan", .age = 22 }
+        ASTNodeType.Annotation => {
+            // @Generic, @TypeOf etc. — just emit the name
+            if (node.token == null) return "/* @builtin */";
+            const bname = node.token.?.value;
+            if (std.mem.eql(u8, bname, "TypeOf") and node.children != null and node.children.?.items.len > 0) {
+                const arg = try printExpression(allocator, data, node.children.?.items[0]);
+                return std.fmt.allocPrint(allocator.*, "typeof({s})", .{arg}) catch return ConvertError.Out_Of_Memory;
+            }
+            return std.fmt.allocPrint(allocator.*, "/* @{s} */", .{bname}) catch return ConvertError.Out_Of_Memory;
+        },
+
         else => {
             data.error_token = node.token;
             return ConvertError.Unimplemented_Node_Type;

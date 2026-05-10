@@ -7,6 +7,8 @@ const ASTNode = node_mod.ASTNode;
 const ASTNodeType = node_mod.ASTNodeType;
 const Allocator = std.mem.Allocator;
 
+// Map a primitive Razen token type to its C equivalent string.
+// Returns null for non-primitive types (structs, enums, user-defined names).
 pub fn convertToCType(tt: TokenType) ?[]const u8 {
     switch (tt) {
         TokenType.I1, TokenType.I2, TokenType.I4, TokenType.I8 => return "i8",
@@ -35,8 +37,9 @@ pub fn convertToCType(tt: TokenType) ?[]const u8 {
     }
 }
 
-/// Converts an AST type node to a C type string.
-/// current_struct: pass the enclosing struct name so @Self resolves correctly; null otherwise.
+// Convert an AST type node to a C type string, substituting @Self when
+// the caller provides the enclosing struct/behave name.
+// Pass null for current_struct outside of struct/behave emission.
 pub fn nodeToCTypeWithSelf(allocator: *Allocator, node: *ASTNode, current_struct: ?[]const u8) anyerror![]const u8 {
     if (node.node_type == ASTNodeType.ArrayType) {
         const inner = try nodeToCTypeWithSelf(allocator, node.left.?, current_struct);
@@ -45,6 +48,24 @@ pub fn nodeToCTypeWithSelf(allocator: *Allocator, node: *ASTNode, current_struct
 
     if (node.node_type == ASTNodeType.VarType) {
         const tok = node.token orelse return "void";
+
+        // ?T optional  ->  Option_<T>
+        if (tok.token_type == TokenType.QuestionMark and node.left != null) {
+            const inner = try nodeToCTypeWithSelf(allocator, node.left.?, current_struct);
+            return std.fmt.allocPrint(allocator.*, "Option_{s}", .{inner}) catch "void*";
+        }
+
+        // !T failable   ->  Result_<T>
+        // Error!T       ->  <Error>_Result_<T>
+        if (tok.token_type == TokenType.ExclamationMark and node.left != null) {
+            if (node.left.?.node_type == ASTNodeType.VarType and node.left.?.left != null) {
+                const err_type = try nodeToCTypeWithSelf(allocator, node.left.?, current_struct);
+                const val_type = try nodeToCTypeWithSelf(allocator, node.left.?.left.?, current_struct);
+                return std.fmt.allocPrint(allocator.*, "{s}_Result_{s}", .{ err_type, val_type }) catch "void*";
+            }
+            const inner = try nodeToCTypeWithSelf(allocator, node.left.?, current_struct);
+            return std.fmt.allocPrint(allocator.*, "Result_{s}", .{inner}) catch "void*";
+        }
 
         // primitive type
         if (convertToCType(tok.token_type)) |prim| {
@@ -58,24 +79,19 @@ pub fn nodeToCTypeWithSelf(allocator: *Allocator, node: *ASTNode, current_struct
             return prim;
         }
 
-        // C4 FIX: @Self → resolve to current struct/behave name.
-        // The parser eats '@' and stores the name token directly as Identifier "Self".
-        // MUST be checked before the generic Identifier fallback below.
+        // @Self resolves to the current struct/behave name.
+        // The parser eats '@' and stores "Self" as an Identifier token.
         if (tok.token_type == TokenType.Identifier and std.mem.eql(u8, tok.value, "Self")) {
             if (current_struct) |name| return name;
-            return "void*"; // @Self used outside struct context — safe fallback
+            return "void*";
         }
 
-        if (tok.token_type == TokenType.At) {
-            return "void*"; // bare @ without name
-        }
+        if (tok.token_type == TokenType.At) return "void*";
 
-        // identifier type like State, NetErr, user-defined names
-        if (tok.token_type == TokenType.Identifier) {
-            return tok.value;
-        }
+        // user-defined type name (struct, enum, union, etc.)
+        if (tok.token_type == TokenType.Identifier) return tok.value;
 
-        // pointer to user type: *State
+        // *T pointer
         if (tok.token_type == TokenType.Star and node.left != null) {
             const inner = try nodeToCTypeWithSelf(allocator, node.left.?, current_struct);
             return try std.fmt.allocPrint(allocator.*, "{s}*", .{inner});
@@ -87,7 +103,7 @@ pub fn nodeToCTypeWithSelf(allocator: *Allocator, node: *ASTNode, current_struct
     return "void";
 }
 
-/// Convenience wrapper with no struct context (most callers use this).
+// Convenience wrapper — no struct context needed for most callers.
 pub fn nodeToCType(allocator: *Allocator, node: *ASTNode) anyerror![]const u8 {
     return nodeToCTypeWithSelf(allocator, node, null);
 }
