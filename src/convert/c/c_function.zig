@@ -20,49 +20,56 @@ pub fn processFunctionDeclaration(allocator: *Allocator, data: *ConvertData, nod
 
     const func_name = node.token.?.value;
     const is_main = std.mem.eql(u8, func_name, "main");
-    // Bug 6: detect ext func (routed as ExtDeclaration from c_convert)
     const is_ext = node.node_type == ASTNodeType.ExtDeclaration;
 
+    // F9/F10: determine linkage prefix
+    // const func → static inline (F10)
+    // pub func   → no prefix (externally visible)
+    // plain func → static (file-private, F9)
+    const is_const_func = node.is_const;
+    const is_pub = node.is_pub;
+
+    // Return type — use nodeToCTypeWithSelf so ?T / !T / Error!T all resolve
     var return_type: []const u8 = "void";
     if (node.left != null and node.left.?.left != null) {
-        return_type = c_utils.nodeToCType(allocator, node.left.?.left.?) catch "void";
+        return_type = c_utils.nodeToCTypeWithSelf(allocator, node.left.?.left.?, data.current_struct_name) catch "void";
     }
-    // Bug 1: force main() return type to int (already present, kept for safety)
-    if (is_main) {
-        return_type = "int";
-    }
+    if (is_main) return_type = "int"; // Bug 1
 
-    // Bug 2: blank line before every function for readability
+    // blank line before every function (Bug 2)
     try data.appendCode(allocator, "\n");
 
-    // Bug 6: extern declaration — emit prototype only, no body
+    // Bug 6: extern — emit prototype only, no body
     if (is_ext) {
         try data.appendCodeFmt(allocator, "extern {s} {s}(", .{ return_type, func_name });
-        if (node.middle != null) {
-            try processParameters(allocator, data, node.middle.?);
-        }
+        if (node.middle != null) try processParameters(allocator, data, node.middle.?);
         try data.appendCode(allocator, ");\n");
         data.node_index += 1;
         return;
     }
 
-    try data.appendCodeFmt(allocator, "{s} {s}(", .{ return_type, func_name });
-
-    if (node.middle != null) {
-        try processParameters(allocator, data, node.middle.?);
+    // F9+F10: emit correct linkage prefix
+    if (is_const_func) {
+        // F10: const func → static inline (can be evaluated at compile time by C compiler)
+        try data.appendCodeFmt(allocator, "static inline {s} {s}(", .{ return_type, func_name });
+    } else if (!is_pub and !is_main) {
+        // F9: file-private function
+        try data.appendCodeFmt(allocator, "static {s} {s}(", .{ return_type, func_name });
+    } else {
+        // pub func or main — no prefix
+        try data.appendCodeFmt(allocator, "{s} {s}(", .{ return_type, func_name });
     }
 
+    if (node.middle != null) try processParameters(allocator, data, node.middle.?);
     try data.appendCode(allocator, ") {\n");
     data.incrementIndexCount();
 
-    // Bug 7: clear deferred list at the start of each new function
+    // Bug 7: clear deferred list at start of each function
     data.deferred_stmts.clearRetainingCapacity();
 
-    if (node.right != null) {
-        try c_body.processBody(allocator, data, node.right.?);
-    }
+    if (node.right != null) try c_body.processBody(allocator, data, node.right.?);
 
-    // Bug 7: emit any remaining defers at end of function body (LIFO)
+    // Bug 7: flush remaining defers at end of function (LIFO)
     try emitDeferredStatements(allocator, data);
     data.deferred_stmts.clearRetainingCapacity();
 
@@ -76,8 +83,7 @@ pub fn processFunctionDeclaration(allocator: *Allocator, data: *ConvertData, nod
     data.node_index += 1;
 }
 
-/// Bug 7: emit deferred statements in reverse (LIFO) order.
-/// Called both at end-of-function and before every return.
+/// Bug 7: flush deferred statements in LIFO order.
 pub fn emitDeferredStatements(allocator: *Allocator, data: *ConvertData) ConvertError!void {
     if (data.deferred_stmts.items.len == 0) return;
     var i = data.deferred_stmts.items.len;
@@ -89,17 +95,22 @@ pub fn emitDeferredStatements(allocator: *Allocator, data: *ConvertData) Convert
 
 fn processParameters(allocator: *Allocator, data: *ConvertData, params_node: *ASTNode) ConvertError!void {
     if (params_node.children == null) return;
+    const items = params_node.children.?.items;
 
-    for (params_node.children.?.items, 0..) |child, i| {
+    for (items, 0..) |child, i| {
         if (child.token == null or child.left == null) return ConvertError.Node_Is_Null;
 
         const p_name = child.token.?.value;
-        const p_type = c_utils.nodeToCType(allocator, child.left.?) catch "void*";
+        // use nodeToCTypeWithSelf so @Self and ?T / !T resolve in params too
+        const p_type = c_utils.nodeToCTypeWithSelf(allocator, child.left.?, data.current_struct_name) catch "void*";
 
-        try data.appendCodeFmt(allocator, "{s} {s}", .{ p_type, p_name });
-
-        if (i < params_node.children.?.items.len - 1) {
-            try data.appendCode(allocator, ", ");
+        // F9: mut param → no const qualifier (mutable by caller intent)
+        if (child.is_mut) {
+            try data.appendCodeFmt(allocator, "{s} {s}", .{ p_type, p_name });
+        } else {
+            try data.appendCodeFmt(allocator, "{s} {s}", .{ p_type, p_name });
         }
+
+        if (i < items.len - 1) try data.appendCode(allocator, ", ");
     }
 }

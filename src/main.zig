@@ -2,6 +2,7 @@ const std = @import("std");
 const code_samples = @import("samples/sample2.zig");
 const critical_samples = @import("samples/sample3.zig");
 const phase3_samples = @import("samples/sample4.zig");
+const feature_samples = @import("samples/sample5.zig");
 const semantic_samples = @import("samples/semantic_test.zig");
 const parser = @import("parser/parser.zig");
 const lexer = @import("lexer/lexer.zig");
@@ -94,4 +95,17 @@ pub fn main() void {
     convertCode("C7: UNION CONSTRUCTOR",            phase3_samples.UNION_CONSTRUCTOR);
     convertCode("C8: ASSIGNMENT IN MATCH",          phase3_samples.ASSIGNMENT_IN_MATCH);
     convertCode("COMBINED C6+C7+C8",               phase3_samples.COMBINED_C6_C7_C8);
+
+    // ── Important Features F1-F16 ─────────────────────────────────
+    convertCode("F1: OPTIONAL ?T",                 feature_samples.OPTIONAL_TYPE);
+    convertCode("F2: ERROR UNION RETURN",           feature_samples.ERROR_UNION_RETURN);
+    convertCode("F4: ENUM BACKING TYPE",            feature_samples.ENUM_BACKING_TYPE);
+    convertCode("F5: BIT FLAG ENUM",               feature_samples.ENUM_BIT_FLAGS);
+    convertCode("F9: PUB VISIBILITY",               feature_samples.PUB_VISIBILITY);
+    convertCode("F10: CONST FUNC",                  feature_samples.CONST_FUNC);
+    convertCode("F13: FORMAT STRINGS",              feature_samples.FORMAT_STRING);
+    convertCode("F16: REFERENCES &x / ptr.*",       feature_samples.REFERENCES);
+    convertCode("F8: BEHAVE NEEDS FIELDS",          feature_samples.BEHAVE_NEEDS);
+    convertCode("F12: ALLOCATOR BUILTINS",          feature_samples.ALLOCATOR_BUILTINS);
+    convertCode("COMBINED F4+F5+F9+F10+F13",       feature_samples.COMBINED_FEATURES);
 }
