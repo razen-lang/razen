@@ -60,6 +60,7 @@ pub const ASTNodeType = enum {
     UnaryExpression, // -x, !x
     MemberAccess, // a.b — dot member access
     Identifier, // a name that refers to something
+    BuiltinExpression, // @Builtin
 
     // ── statements ────────────────────────────────────────────────────────
     ReturnStatement, // ret expr

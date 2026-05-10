@@ -20,15 +20,10 @@ pub fn processDeclaration(allocator: *Allocator, data: *ConvertData, node: *ASTN
         try data.addTab(allocator);
     }
 
-    var c_type: []const u8 = "auto";
-    if (node.left != null and node.left.?.token != null) {
-        c_type = node.left.?.token.?.value;
-        
-        // mapping with c_utils
+    var c_type: []const u8 = "__auto_type";
+    if (node.left != null) {
         const c_utils = @import("c_utils.zig");
-        if (c_utils.convertToCType(node.left.?.token.?.token_type)) |ct| {
-            c_type = ct;
-        }
+        c_type = c_utils.nodeToCType(allocator, node.left.?) catch "__auto_type";
     }
 
     if (node.right == null) {

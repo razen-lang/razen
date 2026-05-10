@@ -5,6 +5,9 @@ const errors = @import("../errors.zig");
 const lexer = @import("../../lexer/lexer.zig");
 
 const c_function = @import("c_function.zig");
+const c_struct = @import("c_struct.zig");
+const c_enums = @import("c_enums.zig");
+const c_unions = @import("c_unions.zig");
 
 const print = std.debug.print;
 const ASTNode = node_mod.ASTNode;
@@ -53,10 +56,12 @@ pub fn convert(allocator: *Allocator, ast_nodes: *ArrayList(*ASTNode), source: [
 
 fn writeIncludes(allocator: *Allocator, data: *ConvertData) ConvertError!void {
     const stdint = "#include <stdint.h>\n";
-    const stdbool = "#include <stdbool.h>\n\n";
+    const stdbool = "#include <stdbool.h>\n";
+    const razen_core = "#include \"razen_core.h\"\n\n";
 
     try data.appendCode(allocator, stdint);
     try data.appendCode(allocator, stdbool);
+    try data.appendCode(allocator, razen_core);
 }
 
 fn processGlobalNode(allocator: *Allocator, data: *ConvertData) ConvertError!void {
@@ -71,8 +76,32 @@ fn processGlobalNode(allocator: *Allocator, data: *ConvertData) ConvertError!voi
             const c_declaration = @import("c_declaration.zig");
             try c_declaration.processDeclaration(allocator, data, node.?, true, false);
         },
+        ASTNodeType.StructDeclaration => try c_struct.processStruct(allocator, data, node.?),
+        ASTNodeType.BehaveDeclaration => try c_struct.processBehave(allocator, data, node.?),
+        ASTNodeType.EnumDeclaration => try c_enums.processEnum(allocator, data, node.?),
+        ASTNodeType.ErrorDeclaration => try c_enums.processErrorDecl(allocator, data, node.?),
+        ASTNodeType.UnionDeclaration => try c_unions.processUnion(allocator, data, node.?),
+        ASTNodeType.ExtDeclaration => try c_function.processFunctionDeclaration(allocator, data, node.?),
+        ASTNodeType.ModuleDeclaration => {
+             // C doesn't have modules, we'll emit a comment
+             try data.appendCodeFmt(allocator, "// Module {s}\n", .{ node.?.token.?.value });
+        },
+        ASTNodeType.UseDeclaration => {
+             // use std.io -> #include <std.io.h> 
+             // In a real compiler we'd resolve headers, here we just emit what it says
+             const path = node.?.token.?.value;
+             try data.appendCodeFmt(allocator, "#include \"{s}.h\"\n", .{ path });
+        },
+        ASTNodeType.TypeAliasDeclaration => {
+             // type Flags = u32
+             if (node.?.left != null) {
+                 const c_utils = @import("c_utils.zig");
+                 const base_type = c_utils.nodeToCType(allocator, node.?.left.?) catch "void";
+                 try data.appendCodeFmt(allocator, "typedef {s} {s};\n", .{ base_type, node.?.token.?.value });
+             }
+        },
         else => {
-            // @TODO implementation for globals
+            // @TODO implementation for other globals
         }
     }
 }

@@ -1,10 +1,12 @@
 const std = @import("std");
 const code_samples = @import("samples/sample2.zig");
+const semantic_samples = @import("samples/semantic_test.zig");
 const parser = @import("parser/parser.zig");
 const lexer = @import("lexer/lexer.zig");
 const token = @import("lexer/token.zig");
 const debugging = @import("debug/debug.zig");
 const ast_builder = @import("ast/ast_builder.zig");
+const semantic = @import("semantic/analyzer.zig");
 const c_convert = @import("convert/c/c_convert.zig");
 const print = std.debug.print;
 const ArenaAllocator = std.heap.ArenaAllocator;
@@ -41,8 +43,27 @@ fn convertCode(source: []const u8) void {
     };
     debugging.printAST(ast_nodes);
 
-    // ── Phase 3: convert AST to C code ────────────────────────
+    // ── Phase 3: Semantic Analysis ─────────────────────────────────────────
     print("{s}Phase 3{s}  ", .{ lexer.CREAM, lexer.RESET });
+    var analyzer = semantic.Analyzer.init(&arena_allocator) catch |err| {
+        print("{s}Analyzer Init error: {}{s}\n", .{ lexer.RED, err, lexer.RESET });
+        return;
+    };
+    defer analyzer.deinit();
+
+    analyzer.analyze(ast_nodes) catch |err| {
+        print("{s}Semantic Analysis error: {}{s}\n", .{ lexer.RED, err, lexer.RESET });
+        return;
+    };
+    
+    if (analyzer.has_errors) {
+        print("\n{s}Compilation failed due to semantic errors.{s}\n", .{ lexer.RED, lexer.RESET });
+        return; // Halt compilation!
+    }
+    print("\t\tSemantic Analysis\t\t\tDone\n", .{});
+
+    // ── Phase 4: convert AST to C code ────────────────────────
+    print("{s}Phase 4{s}  ", .{ lexer.CREAM, lexer.RESET });
     const c_code = c_convert.convert(&arena_allocator, ast_nodes, source) catch |err| {
         print("{s}Convert error: {}{s}\n", .{ lexer.RED, err, lexer.RESET });
         return;
@@ -52,7 +73,7 @@ fn convertCode(source: []const u8) void {
 }
 
 pub fn main() void {
-    print("{s}Razen Lang — Phase 3{s}\n", .{ lexer.LIGHT_GREEN, lexer.RESET });
+    print("{s}Razen Lang — Phase 4 Pipeline{s}\n", .{ lexer.LIGHT_GREEN, lexer.RESET });
 
     print("\n{s}▶ Sample: RETURN_ZERO{s}\n", .{ lexer.CYAN, lexer.RESET });
     convertCode(code_samples.RETURN_ZERO);
@@ -68,4 +89,7 @@ pub fn main() void {
 
     print("\n{s}▶ Sample: PHASE 2 EXHAUSTIVE TESTING{s}\n", .{ lexer.CYAN, lexer.RESET });
     convertCode(code_samples.PHASE_2_EXHAUSTIVE);
+
+    print("\n{s}▶ Sample: SEMANTIC ERROR TESTING{s}\n", .{ lexer.CYAN, lexer.RESET });
+    convertCode(semantic_samples.SEMANTIC_ERROR_PROGRAM);
 }

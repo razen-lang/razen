@@ -5,6 +5,7 @@ pub const ConvertError = error{
     No_AST_Nodes,
     Node_Is_Null,
     Invalid_Node_Type,
+    Invalid_Var_Type,
     Invalid_Return_Type,
     Unimplemented_Node_Type,
     Internal_Error,

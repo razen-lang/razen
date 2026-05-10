@@ -33,7 +33,6 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
     data.error_function = "processFunctionBodyNode";
 
     switch (node.node_type) {
-        ASTNodeType.ReturnStatement => try c_return.processReturn(allocator, data, node),
         ASTNodeType.VarDeclaration => try c_declaration.processDeclaration(allocator, data, node, add_new_line, add_tabs),
         ASTNodeType.ConstDeclaration => try c_declaration.processDeclaration(allocator, data, node, add_new_line, add_tabs),
         ASTNodeType.Assignment => try c_assignment.processAssignment(allocator, data, node, add_new_line, add_tabs),
@@ -64,19 +63,90 @@ fn processFunctionBodyNode(allocator: *Allocator, data: *ConvertData, node: *AST
         },
         ASTNodeType.LoopStatement => {
             if (add_tabs) try data.addTab(allocator);
-            try data.appendCode(allocator, "while (1) {\n");
-            data.incrementIndexCount();
-            if (node.right != null) {
+            
+            if (node.left != null and node.middle != null and node.right != null) {
+                // loop items |i| { ... }
+                const items = try c_expr.printExpression(allocator, data, node.left.?);
+                const i = node.middle.?.token.?.value;
+                try data.appendCodeFmt(allocator, "// Simplified loop array\n", .{});
+                try data.addTab(allocator);
+                try data.appendCodeFmt(allocator, "for (size_t _idx = 0; _idx < sizeof({s})/sizeof({s}[0]); _idx++) {{\n", .{ items, items });
+                data.incrementIndexCount();
+                try data.addTab(allocator);
+                try data.appendCodeFmt(allocator, "__auto_type {s} = {s}[_idx];\n", .{ i, items });
                 try processBody(allocator, data, node.right.?);
-            } else if (node.left != null and node.left.?.node_type == ASTNodeType.LoopBody) {
+                data.decrementIndexCount();
+                try data.addTab(allocator);
+                try data.appendCode(allocator, "}\n");
+            } else {
+                try data.appendCode(allocator, "while (1) {\n");
+                data.incrementIndexCount();
+                if (node.right != null) {
+                    try processBody(allocator, data, node.right.?);
+                } else if (node.left != null and node.left.?.node_type == ASTNodeType.LoopBody) {
+                    try processBody(allocator, data, node.left.?);
+                }
+                data.decrementIndexCount();
+                try data.addTab(allocator);
+                try data.appendCode(allocator, "}\n");
+            }
+        },
+        ASTNodeType.MatchStatement => {
+            if (node.left == null or node.children == null) return ConvertError.Node_Is_Null;
+            const match_var = try c_expr.printExpression(allocator, data, node.left.?);
+            
+            if (add_tabs) try data.addTab(allocator);
+            try data.appendCodeFmt(allocator, "// Match {s}\n", .{ match_var });
+            
+            for (node.children.?.items, 0..) |case_node, i| {
+                if (case_node.node_type != ASTNodeType.MatchCase) continue;
+                if (add_tabs) try data.addTab(allocator);
+                
+                if (case_node.left != null) {
+                    const cond = try c_expr.printExpression(allocator, data, case_node.left.?);
+                    if (i == 0) {
+                        try data.appendCodeFmt(allocator, "if ({s} == {s}) {{\n", .{ match_var, cond });
+                    } else {
+                        try data.appendCodeFmt(allocator, "else if ({s} == {s}) {{\n", .{ match_var, cond });
+                    }
+                } else {
+                    try data.appendCode(allocator, "else {\n");
+                }
+                
+                data.incrementIndexCount();
+                if (case_node.right != null and case_node.right.?.left != null) {
+                    try processBody(allocator, data, case_node.right.?.left.?); // block inside MatchBody
+                }
+                data.decrementIndexCount();
+                
+                if (add_tabs) try data.addTab(allocator);
+                try data.appendCode(allocator, "}\n");
+            }
+        },
+        ASTNodeType.DeferStatement => {
+            if (add_tabs) try data.addTab(allocator);
+            try data.appendCode(allocator, "// [Not fully supported in C] Deferred block:\n");
+            if (node.left != null) {
+                // For now, emit it inline, but in a real C backend this would be injected at `return`.
                 try processBody(allocator, data, node.left.?);
             }
-            data.decrementIndexCount();
-            try data.addTab(allocator);
-            try data.appendCode(allocator, "}\n");
+        },
+        ASTNodeType.MemberAccess => {
+            if (add_tabs) try data.addTab(allocator);
+            const call_str = try c_expr.printExpression(allocator, data, node);
+            try data.appendCodeFmt(allocator, "{s};", .{ call_str });
+            if (add_new_line) try data.appendCode(allocator, "\n");
+        },
+        ASTNodeType.ReturnStatement => {
+             // If we had a break statement it uses ASTNodeType.ReturnStatement sometimes depending on token.
+             if (node.token != null and std.mem.eql(u8, node.token.?.value, "break")) {
+                 if (add_tabs) try data.addTab(allocator);
+                 try data.appendCode(allocator, "break;\n");
+             } else {
+                 try c_return.processReturn(allocator, data, node);
+             }
         },
         else => {
-            // @TODO future AST statements
             if (add_tabs) try data.addTab(allocator);
             try data.appendCodeFmt(allocator, "// TODO: Handle node ({any})\n", .{ node.node_type });
         }

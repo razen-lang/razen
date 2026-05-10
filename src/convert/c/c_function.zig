@@ -24,11 +24,8 @@ pub fn processFunctionDeclaration(allocator: *Allocator, data: *ConvertData, nod
     var return_type: []const u8 = "void";
     if (is_main) {
         return_type = "int";
-    } else if (node.left != null and node.left.?.token != null) {
-        return_type = node.left.?.token.?.value;
-        if (c_utils.convertToCType(node.left.?.token.?.token_type)) |ct| {
-            return_type = ct;
-        }
+    } else if (node.left != null and node.left.?.left != null) {
+        return_type = c_utils.nodeToCType(allocator, node.left.?.left.?) catch "void";
     }
 
     try data.appendCodeFmt(allocator, "{s} {s}(", .{ return_type, func_name });
@@ -57,14 +54,10 @@ fn processParameters(allocator: *Allocator, data: *ConvertData, params_node: *AS
     if (params_node.children == null) return;
 
     for (params_node.children.?.items, 0..) |child, i| {
-        if (child.token == null or child.left == null or child.left.?.token == null) return ConvertError.Node_Is_Null;
+        if (child.token == null or child.left == null) return ConvertError.Node_Is_Null;
 
         const p_name = child.token.?.value;
-        var p_type: []const u8 = child.left.?.token.?.value;
-
-        if (c_utils.convertToCType(child.left.?.token.?.token_type)) |ct| {
-            p_type = ct;
-        }
+        const p_type = c_utils.nodeToCType(allocator, child.left.?) catch "void*";
 
         try data.appendCodeFmt(allocator, "{s} {s}", .{ p_type, p_name });
 
