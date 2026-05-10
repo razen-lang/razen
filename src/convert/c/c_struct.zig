@@ -19,6 +19,9 @@ pub fn processStruct(allocator: *Allocator, data: *ConvertData, node: *ASTNode) 
         return ConvertError.Node_Is_Null;
     }
     const struct_name = node.token.?.value;
+    // C4 FIX: track current struct name so @Self resolves correctly
+    data.current_struct_name = struct_name;
+    defer data.current_struct_name = null;
 
     try data.appendCodeFmt(allocator, "typedef struct {{\n", .{});
 
@@ -51,8 +54,11 @@ pub fn processBehave(allocator: *Allocator, data: *ConvertData, node: *ASTNode) 
         return ConvertError.Node_Is_Null;
     }
     const behave_name = node.token.?.value;
+    // C4 FIX: track current behave name so @Self resolves correctly
+    data.current_struct_name = behave_name;
+    defer data.current_struct_name = null;
 
-    // A Behave (Trait) in C can be represented as a struct of function pointers and fields.
+    // A Behave (Trait) in C is a struct of function pointers and fields.
     try data.appendCodeFmt(allocator, "typedef struct {{\n", .{});
 
     if (node.children != null) {
@@ -79,7 +85,8 @@ pub fn processBehave(allocator: *Allocator, data: *ConvertData, node: *ASTNode) 
                     const params = member_node.middle.?.children.?.items;
                     for (params, 0..) |p, i| {
                         if (p.left != null) {
-                            const p_type = c_utils.nodeToCType(allocator, p.left.?) catch "void*";
+                            // C4: pass struct name so @Self resolves
+                            const p_type = c_utils.nodeToCTypeWithSelf(allocator, p.left.?, data.current_struct_name) catch "void*";
                             try data.appendCodeFmt(allocator, "{s} {s}", .{ p_type, p.token.?.value });
                         }
                         if (i < params.len - 1) {

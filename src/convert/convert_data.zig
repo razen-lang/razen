@@ -52,6 +52,8 @@ pub const ConvertData = struct {
     deferred_stmts: std.ArrayList(*ASTNode),
     // Bug 9: counter for fresh temporary variable names
     tmp_counter: usize = 0,
+    // C4 FIX: current struct/behave name so @Self can resolve to the correct C type
+    current_struct_name: ?[]const u8 = null,
 
     pub fn getNode(self: *ConvertData) ?*ASTNode {
         if (self.node_index >= self.ast_nodes.items.len) {
