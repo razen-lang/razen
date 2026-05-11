@@ -62,6 +62,9 @@ pub const ConvertData = struct {
     // monotonic counter for generating unique temporary variable names (_tmp0, _tmp1, ...)
     tmp_counter: usize = 0,
 
+    // current function's LLVM return type string, set by llvm_function before emitting body
+    current_ret_type: ?[]const u8 = null,
+
     // set to the current struct/behave name while emitting its body,
     // so that @Self in method signatures resolves to the right C type name.
     current_struct_name: ?[]const u8 = null,

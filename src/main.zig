@@ -10,7 +10,7 @@ const token = @import("lexer/token.zig");
 const debugging = @import("debug/debug.zig");
 const ast_builder = @import("ast/ast_builder.zig");
 const semantic = @import("semantic/analyzer.zig");
-const c_convert = @import("convert/c/c_convert.zig");
+const llvm_convert = @import("convert/llvm/llvm_convert.zig");
 const print = std.debug.print;
 const ArenaAllocator = std.heap.ArenaAllocator;
 const Allocator = std.mem.Allocator;
@@ -58,13 +58,13 @@ fn convertCode(label: []const u8, source: []const u8) void {
     }
     print("\t\tSemantic Analysis\t\t\tDone\n", .{});
 
-    // Phase 4 — C codegen
+    // Phase 4 — LLVM IR codegen
     print("{s}Phase 4{s}  ", .{ lexer.CREAM, lexer.RESET });
-    const c_code = c_convert.convert(&arena_allocator, ast_nodes, source) catch |err| {
-        print("{s}Convert error: {}{s}\n", .{ lexer.RED, err, lexer.RESET });
+    const llvm_ir = llvm_convert.convert(&arena_allocator, ast_nodes, source) catch |err| {
+        print("{s}LLVM Convert error: {}{s}\n", .{ lexer.RED, err, lexer.RESET });
         return;
     };
-    print("\n{s}Generated C:{s}\n{s}\n", .{ lexer.LIGHT_GREEN, lexer.RESET, c_code });
+    print("\n{s}Generated LLVM IR:{s}\n{s}\n", .{ lexer.LIGHT_GREEN, lexer.RESET, llvm_ir });
 }
 
 pub fn main() void {
