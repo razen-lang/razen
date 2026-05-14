@@ -64,19 +64,20 @@ fn convertCode(label: []const u8, source: []const u8) void {
         print("{s}LLVM Convert error: {}{s}\n", .{ lexer.RED, err, lexer.RESET });
         return;
     };
-    print("\n{s}Generated LLVM IR:{s}\n{s}\n", .{ lexer.LIGHT_GREEN, lexer.RESET, llvm_ir });
+    print("\n{s}Generated LLVM IR:{s}\n", .{ lexer.LIGHT_GREEN, lexer.RESET });
+    print("__LLVM_IR_START__\n{s}\n__LLVM_IR_END__\n", .{llvm_ir});
 }
 
 pub fn main() void {
     print("{s}Razen Lang — Full Pipeline Test{s}\n", .{ lexer.LIGHT_GREEN, lexer.RESET });
     print("{s}std API: std.fmt.print/println | std.os.exit | std.debug.assert/panic{s}\n\n", .{ lexer.GREY, lexer.RESET });
 
-    // ── Core samples ────────────────────────────────────────────────────
+    // ── Test one at a time ──────────────────────────────────────────────
     convertCode("RETURN_ZERO", code_samples.RETURN_ZERO);
-    convertCode("ARITH_EXPR", code_samples.ARITH_EXPR);
-    convertCode("IF_ELSE", code_samples.IF_ELSE);
-    convertCode("FULL_PROGRAM", code_samples.FULL_PROGRAM);
-    convertCode("PHASE_2_EXHAUSTIVE", code_samples.PHASE_2_EXHAUSTIVE);
+    // convertCode("ARITH_EXPR", code_samples.ARITH_EXPR);
+    // convertCode("IF_ELSE", code_samples.IF_ELSE);
+    // convertCode("FULL_PROGRAM", code_samples.FULL_PROGRAM);
+    // convertCode("PHASE_2_EXHAUSTIVE", code_samples.PHASE_2_EXHAUSTIVE);
 
     // ── Critical-bug fix samples ─────────────────────────────────────────
     // convertCode("C1: DEFER ORDER", critical_samples.DEFER_ORDER);

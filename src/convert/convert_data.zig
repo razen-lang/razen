@@ -59,8 +59,18 @@ pub const ConvertData = struct {
     // flushed in LIFO order before every return and at the end of the function.
     deferred_stmts: std.ArrayList(*ASTNode),
 
+    // global constants (name -> literal value)
+    global_constants: std.StringHashMap([]const u8),
+
     // monotonic counter for generating unique temporary variable names (_tmp0, _tmp1, ...)
     tmp_counter: usize = 0,
+
+    // set by terminators (ret, br) to avoid dead code after them
+    block_terminated: bool = false,
+
+    // current loop labels for break/skip codegen
+    current_loop_exit_label: ?[]const u8 = null,
+    current_loop_continue_label: ?[]const u8 = null,
 
     // current function's LLVM return type string, set by llvm_function before emitting body
     current_ret_type: ?[]const u8 = null,

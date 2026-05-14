@@ -32,28 +32,33 @@ pub fn processFunctionDeclaration(
     try writeFunctionSignature(allocator, convert_data, node);
 
     // ── body ───────────────────────────────────────────────────────────────
-    convert_data.generated_code.appendLine(allocator, "entry:")
-        catch return ConvertError.Out_Of_Memory;
+    convert_data.generated_code.appendLine(allocator, "entry:") catch return ConvertError.Out_Of_Memory;
 
     // Reset tmp_counter per function so %t0 … labels are local
     convert_data.tmp_counter = 0;
 
     if (node.right) |body| {
+        convert_data.block_terminated = false;
         try llvm_body.processBody(allocator, convert_data, body);
+        if (!convert_data.block_terminated) {
+            const ret_type = convert_data.current_ret_type orelse "void";
+            if (std.mem.eql(u8, ret_type, "void")) {
+                convert_data.generated_code.appendLine(allocator, "\tret void") catch return ConvertError.Out_Of_Memory;
+            } else {
+                convert_data.generated_code.appendFmt(allocator, "\tret {s} 0\n", .{ret_type}) catch return ConvertError.Out_Of_Memory;
+            }
+        }
     } else {
         // Empty body — emit a safe default terminator
         const ret_type = convert_data.current_ret_type orelse "void";
         if (std.mem.eql(u8, ret_type, "void")) {
-            convert_data.generated_code.appendLine(allocator, "\tret void")
-                catch return ConvertError.Out_Of_Memory;
+            convert_data.generated_code.appendLine(allocator, "\tret void") catch return ConvertError.Out_Of_Memory;
         } else {
-            convert_data.generated_code.appendFmt(allocator, "\tret {s} 0\n", .{ret_type})
-                catch return ConvertError.Out_Of_Memory;
+            convert_data.generated_code.appendFmt(allocator, "\tret {s} 0\n", .{ret_type}) catch return ConvertError.Out_Of_Memory;
         }
     }
 
-    convert_data.generated_code.append(allocator, "}\n\n")
-        catch return ConvertError.Out_Of_Memory;
+    convert_data.generated_code.append(allocator, "}\n\n") catch return ConvertError.Out_Of_Memory;
 }
 
 // ── function signature line ───────────────────────────────────────────────────
@@ -85,16 +90,14 @@ fn writeFunctionSignature(
     convert_data.current_ret_type = ret_type;
 
     // ── emit define line ───────────────────────────────────────────────────
-    convert_data.generated_code.appendFmt(allocator, "define {s} @{s}(", .{ ret_type, fn_name })
-        catch return ConvertError.Out_Of_Memory;
+    convert_data.generated_code.appendFmt(allocator, "define {s} @{s}(", .{ ret_type, fn_name }) catch return ConvertError.Out_Of_Memory;
 
     // ── parameters ─────────────────────────────────────────────────────────
     if (node.middle != null) {
         try writeParameters(allocator, convert_data, node);
     }
 
-    convert_data.generated_code.append(allocator, ") {\n")
-        catch return ConvertError.Out_Of_Memory;
+    convert_data.generated_code.append(allocator, ") {\n") catch return ConvertError.Out_Of_Memory;
 }
 
 fn writeParameters(
@@ -129,12 +132,10 @@ fn writeParameters(
         }
 
         // In LLVM IR, parameters are plain values: `i32 %name`
-        convert_data.generated_code.appendFmt(allocator, "{s} %{s}", .{ param_type, param_name })
-            catch return ConvertError.Out_Of_Memory;
+        convert_data.generated_code.appendFmt(allocator, "{s} %{s}", .{ param_type, param_name }) catch return ConvertError.Out_Of_Memory;
 
         if (i < child_count - 1) {
-            convert_data.generated_code.append(allocator, ", ")
-                catch return ConvertError.Out_Of_Memory;
+            convert_data.generated_code.append(allocator, ", ") catch return ConvertError.Out_Of_Memory;
         }
 
         // Record parameter name so load codegen can find it

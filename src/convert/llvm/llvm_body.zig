@@ -223,6 +223,9 @@ fn processIf(
     const then_lbl = try freshLabel(allocator, convert_data);
     const merge_lbl = try freshLabel(allocator, convert_data);
 
+    var then_terminated = false;
+    var else_terminated = false;
+
     if (node.right != null) {
         const else_lbl = try freshLabel(allocator, convert_data);
         convert_data.generated_code.appendFmt(
@@ -232,12 +235,18 @@ fn processIf(
         ) catch return ConvertError.Out_Of_Memory;
 
         convert_data.generated_code.appendFmt(allocator, "{s}:\n", .{then_lbl}) catch return ConvertError.Out_Of_Memory;
+        convert_data.block_terminated = false;
         if (node.middle) |then_body| try processBody(allocator, convert_data, then_body);
-        convert_data.generated_code.appendFmt(allocator, "\tbr label %{s}\n", .{merge_lbl}) catch return ConvertError.Out_Of_Memory;
+        then_terminated = convert_data.block_terminated;
+        if (!then_terminated)
+            convert_data.generated_code.appendFmt(allocator, "\tbr label %{s}\n", .{merge_lbl}) catch return ConvertError.Out_Of_Memory;
 
         convert_data.generated_code.appendFmt(allocator, "{s}:\n", .{else_lbl}) catch return ConvertError.Out_Of_Memory;
+        convert_data.block_terminated = false;
         try processBody(allocator, convert_data, node.right.?);
-        convert_data.generated_code.appendFmt(allocator, "\tbr label %{s}\n", .{merge_lbl}) catch return ConvertError.Out_Of_Memory;
+        else_terminated = convert_data.block_terminated;
+        if (!else_terminated)
+            convert_data.generated_code.appendFmt(allocator, "\tbr label %{s}\n", .{merge_lbl}) catch return ConvertError.Out_Of_Memory;
     } else {
         convert_data.generated_code.appendFmt(
             allocator,
@@ -246,11 +255,20 @@ fn processIf(
         ) catch return ConvertError.Out_Of_Memory;
 
         convert_data.generated_code.appendFmt(allocator, "{s}:\n", .{then_lbl}) catch return ConvertError.Out_Of_Memory;
+        convert_data.block_terminated = false;
         if (node.middle) |then_body| try processBody(allocator, convert_data, then_body);
-        convert_data.generated_code.appendFmt(allocator, "\tbr label %{s}\n", .{merge_lbl}) catch return ConvertError.Out_Of_Memory;
+        then_terminated = convert_data.block_terminated;
+        if (!then_terminated)
+            convert_data.generated_code.appendFmt(allocator, "\tbr label %{s}\n", .{merge_lbl}) catch return ConvertError.Out_Of_Memory;
     }
 
-    convert_data.generated_code.appendFmt(allocator, "{s}:\n", .{merge_lbl}) catch return ConvertError.Out_Of_Memory;
+    const need_merge = if (node.right != null) !then_terminated or !else_terminated else true;
+    if (need_merge) {
+        convert_data.block_terminated = false;
+        convert_data.generated_code.appendFmt(allocator, "{s}:\n", .{merge_lbl}) catch return ConvertError.Out_Of_Memory;
+    } else {
+        convert_data.block_terminated = true;
+    }
 }
 
 // ── loop (infinite, back-edge only) ──────────────────────────────────────────
@@ -265,6 +283,11 @@ fn processLoop(
     const loop_lbl = try freshLabel(allocator, convert_data);
     const exit_lbl = try freshLabel(allocator, convert_data);
 
+    const saved_exit = convert_data.current_loop_exit_label;
+    const saved_continue = convert_data.current_loop_continue_label;
+    convert_data.current_loop_exit_label = exit_lbl;
+    convert_data.current_loop_continue_label = loop_lbl;
+
     convert_data.generated_code.appendFmt(allocator, "\tbr label %{s}\n", .{loop_lbl}) catch return ConvertError.Out_Of_Memory;
     convert_data.generated_code.appendFmt(allocator, "{s}:\n", .{loop_lbl}) catch return ConvertError.Out_Of_Memory;
 
@@ -272,6 +295,9 @@ fn processLoop(
 
     convert_data.generated_code.appendFmt(allocator, "\tbr label %{s}\n", .{loop_lbl}) catch return ConvertError.Out_Of_Memory;
     convert_data.generated_code.appendFmt(allocator, "{s}:\n", .{exit_lbl}) catch return ConvertError.Out_Of_Memory;
+
+    convert_data.current_loop_exit_label = saved_exit;
+    convert_data.current_loop_continue_label = saved_continue;
 }
 
 // ── standalone function call / member-access call ─────────────────────────────

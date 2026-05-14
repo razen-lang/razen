@@ -19,3 +19,5 @@ entry:
 	%t6 = add i32 %t4, %t5
 	ret i32 %t6
 }
+
+

@@ -52,7 +52,9 @@ pub fn flattenExpression(
         },
         .StringLiteral => {
             if (node.token == null) return ConvertError.Node_Is_Null;
-            return node.token.?.value;
+            const s = node.token.?.value;
+            _ = s;
+            return "0";
         },
 
         // -- identifier (variable / parameter) ------------------------------
@@ -77,8 +79,13 @@ pub fn flattenExpression(
                 // Parameter -- already in %name
                 return std.fmt.allocPrint(allocator.*, "%{s}", .{name}) catch return ConvertError.Out_Of_Memory;
             }
-            // Unknown -- treat as SSA value %name
-            return std.fmt.allocPrint(allocator.*, "%{s}", .{name}) catch return ConvertError.Out_Of_Memory;
+            // Check global constants (e.g. const MAX : i32 = 100)
+            if (convert_data.global_constants.get(name)) |val| {
+                return val;
+            }
+            convert_data.error_detail = "Undefined identifier";
+            convert_data.error_token = node.token;
+            return ConvertError.Invalid_Node_Type;
         },
 
         // -- binary expression ----------------------------------------------
@@ -127,10 +134,7 @@ pub fn flattenExpression(
         },
 
         // -- member access (std.fmt.X etc.) -- return placeholder ----------
-        .MemberAccess => {
-            if (node.token) |tok| return tok.value;
-            return "0";
-        },
+        .MemberAccess => return "0",
 
         else => {
             convert_data.error_detail = "flattenExpression: unsupported node type";
