@@ -104,6 +104,9 @@ fn getToken(allocator: *Allocator, lex_data: *Lexer) !Token {
     if (current_char == '\'') {
         return readChar(allocator, lex_data);
     }
+    if (current_char == '.') {
+        return readDotOperator(allocator, lex_data);
+    }
     if (helpers.isOperator(current_char)) {
         return readOperator(allocator, lex_data);
     }
@@ -153,6 +156,31 @@ fn readSeparator(allocator: *Allocator, lex_data: *Lexer) !Token {
     return Token{ .value = tokenText, .token_type = helpers.getTokenType(tokenText), .line = lex_data.line_count, .character = lex_data.character_count };
 }
 
+// handles dot, dotdot, dotdotequals, and ellipsis
+fn readDotOperator(allocator: *Allocator, lex_data: *Lexer) !Token {
+    var text_builder: ArrayList(u8) = try ArrayList(u8).initCapacity(allocator.*, 0);
+    try text_builder.append(allocator.*, '.');
+    lex_data.character_index += 1;
+
+    // check for second dot
+    if (lex_data.character_index < lex_data.source.len and lex_data.source[lex_data.character_index] == '.') {
+        try text_builder.append(allocator.*, '.');
+        lex_data.character_index += 1;
+
+        // check for third dot or equals
+        if (lex_data.character_index < lex_data.source.len) {
+            const third = lex_data.source[lex_data.character_index];
+            if (third == '.' or third == '=') {
+                try text_builder.append(allocator.*, third);
+                lex_data.character_index += 1;
+            }
+        }
+    }
+
+    const text: []u8 = try text_builder.toOwnedSlice(allocator.*);
+    return Token{ .value = text, .token_type = helpers.getTokenType(text), .line = lex_data.line_count, .character = lex_data.character_count };
+}
+
 // reads a single-quoted char literal — expects exactly one character between the quotes
 fn readChar(allocator: *Allocator, lex_data: *Lexer) !Token {
     lex_data.character_index += 1; // skip past the opening '
@@ -177,19 +205,26 @@ fn readChar(allocator: *Allocator, lex_data: *Lexer) !Token {
     return Token{ .value = char_value, .token_type = TokenType.CharValue, .line = lex_data.line_count, .character = lex_data.character_count };
 }
 
-// reads an operator — also peeks one ahead to catch compound operators like == or !=
+// reads an operator — peeks ahead to catch compound operators like ==, !=, >=, <=, =>, ->, ~>
 fn readOperator(allocator: *Allocator, lex_data: *Lexer) !Token {
     var text_builder: ArrayList(u8) = try ArrayList(u8).initCapacity(allocator.*, 0);
 
-    const char: u8 = lex_data.source[lex_data.character_index];
-    try text_builder.append(allocator.*, char);
-
+    const first: u8 = lex_data.source[lex_data.character_index];
+    try text_builder.append(allocator.*, first);
     lex_data.character_index += 1;
 
-    // peek at the next character — if it's also an operator, consume it too
+    // peek at the next character
     if (lex_data.character_index < lex_data.source.len) {
         const next: u8 = lex_data.source[lex_data.character_index];
-        if (helpers.isOperator(next)) {
+
+        // common compound operators: ==, !=, <=, >=, +=, -=, *=, /=, %=, :=, =>, ->, ~>
+        const is_compound = (next == '=') or
+            (first == '-' and next == '>') or
+            (first == '~' and next == '>') or
+            (first == '<' and next == '<') or
+            (first == '>' and next == '>');
+
+        if (is_compound) {
             try text_builder.append(allocator.*, next);
             lex_data.character_index += 1;
         }

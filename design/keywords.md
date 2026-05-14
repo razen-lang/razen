@@ -8,7 +8,7 @@
 | `error`  | declare an error sets                        | Declaration    |
 | `struct` | declare a structur                           | Declaration    |
 | `behave` | declare a shared behaviour                   | Declaration    |
-| `ext`    | implement a behave on a type from outside it | Declaration    |
+| `ext`    | implement a behave on a type from outside it, for func and etc. | Declaration    |
 | `func`   | define a function                            | Declaration    |
 | `pub`    | mark something as publicly accessible        | Declaration    |
 | `mod`    | declare a module                             | Declaration    |

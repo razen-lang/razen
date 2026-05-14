@@ -79,33 +79,33 @@ pub fn main() void {
     convertCode("PHASE_2_EXHAUSTIVE", code_samples.PHASE_2_EXHAUSTIVE);
 
     // ── Critical-bug fix samples ─────────────────────────────────────────
-    convertCode("C1: DEFER ORDER", critical_samples.DEFER_ORDER);
-    convertCode("C1: DEFER BEFORE RETURN", critical_samples.DEFER_BEFORE_RETURN);
-    convertCode("C2: TRY/CATCH", critical_samples.TRY_CATCH_BASIC);
-    convertCode("C3: TAGGED UNION", critical_samples.TAGGED_UNION);
-    convertCode("C3: TAGGED UNION STRUCT VARIANT", critical_samples.TAGGED_UNION_STRUCT_VARIANT);
-    convertCode("C4: @SELF IN BEHAVE", critical_samples.SELF_IN_BEHAVE);
-    convertCode("C5: USE PATH DOTS", critical_samples.USE_PATH);
-    convertCode("STD.DEBUG ASSERT+PANIC", critical_samples.DEBUG_ASSERT);
-    convertCode("STD.OS EXIT+CLOCK", critical_samples.OS_SAMPLE);
-    convertCode("STRUCT+MATCH+DEFER", critical_samples.STRUCT_MATCH_DEFER);
+    // convertCode("C1: DEFER ORDER", critical_samples.DEFER_ORDER);
+    // convertCode("C1: DEFER BEFORE RETURN", critical_samples.DEFER_BEFORE_RETURN);
+    // convertCode("C2: TRY/CATCH", critical_samples.TRY_CATCH_BASIC);
+    // convertCode("C3: TAGGED UNION", critical_samples.TAGGED_UNION);
+    // convertCode("C3: TAGGED UNION STRUCT VARIANT", critical_samples.TAGGED_UNION_STRUCT_VARIANT);
+    // convertCode("C4: @SELF IN BEHAVE", critical_samples.SELF_IN_BEHAVE);
+    // convertCode("C5: USE PATH DOTS", critical_samples.USE_PATH);
+    // convertCode("STD.DEBUG ASSERT+PANIC", critical_samples.DEBUG_ASSERT);
+    // convertCode("STD.OS EXIT+CLOCK", critical_samples.OS_SAMPLE);
+    // convertCode("STRUCT+MATCH+DEFER", critical_samples.STRUCT_MATCH_DEFER);
 
     // ── Phase 3: C6/C7/C8 critical fixes ────────────────────────────────
-    convertCode("C6: MATCH PAYLOAD BINDING", phase3_samples.MATCH_PAYLOAD);
-    convertCode("C7: UNION CONSTRUCTOR", phase3_samples.UNION_CONSTRUCTOR);
-    convertCode("C8: ASSIGNMENT IN MATCH", phase3_samples.ASSIGNMENT_IN_MATCH);
-    convertCode("COMBINED C6+C7+C8", phase3_samples.COMBINED_C6_C7_C8);
+    // convertCode("C6: MATCH PAYLOAD BINDING", phase3_samples.MATCH_PAYLOAD);
+    // convertCode("C7: UNION CONSTRUCTOR", phase3_samples.UNION_CONSTRUCTOR);
+    // convertCode("C8: ASSIGNMENT IN MATCH", phase3_samples.ASSIGNMENT_IN_MATCH);
+    // convertCode("COMBINED C6+C7+C8", phase3_samples.COMBINED_C6_C7_C8);
 
     // ── Important Features F1-F16 ─────────────────────────────────
-    convertCode("F1: OPTIONAL ?T", feature_samples.OPTIONAL_TYPE);
-    convertCode("F2: ERROR UNION RETURN", feature_samples.ERROR_UNION_RETURN);
-    convertCode("F4: ENUM BACKING TYPE", feature_samples.ENUM_BACKING_TYPE);
-    convertCode("F5: BIT FLAG ENUM", feature_samples.ENUM_BIT_FLAGS);
-    convertCode("F9: PUB VISIBILITY", feature_samples.PUB_VISIBILITY);
-    convertCode("F10: CONST FUNC", feature_samples.CONST_FUNC);
-    convertCode("F13: FORMAT STRINGS", feature_samples.FORMAT_STRING);
-    convertCode("F16: REFERENCES &x / ptr.*", feature_samples.REFERENCES);
-    convertCode("F8: BEHAVE NEEDS FIELDS", feature_samples.BEHAVE_NEEDS);
-    convertCode("F12: ALLOCATOR BUILTINS", feature_samples.ALLOCATOR_BUILTINS);
-    convertCode("COMBINED F4+F5+F9+F10+F13", feature_samples.COMBINED_FEATURES);
+    // convertCode("F1: OPTIONAL ?T", feature_samples.OPTIONAL_TYPE);
+    // convertCode("F2: ERROR UNION RETURN", feature_samples.ERROR_UNION_RETURN);
+    // convertCode("F4: ENUM BACKING TYPE", feature_samples.ENUM_BACKING_TYPE);
+    // convertCode("F5: BIT FLAG ENUM", feature_samples.ENUM_BIT_FLAGS);
+    // convertCode("F9: PUB VISIBILITY", feature_samples.PUB_VISIBILITY);
+    // convertCode("F10: CONST FUNC", feature_samples.CONST_FUNC);
+    // convertCode("F13: FORMAT STRINGS", feature_samples.FORMAT_STRING);
+    // convertCode("F16: REFERENCES &x / ptr.*", feature_samples.REFERENCES);
+    // convertCode("F8: BEHAVE NEEDS FIELDS", feature_samples.BEHAVE_NEEDS);
+    // convertCode("F12: ALLOCATOR BUILTINS", feature_samples.ALLOCATOR_BUILTINS);
+    // convertCode("COMBINED F4+F5+F9+F10+F13", feature_samples.COMBINED_FEATURES);
 }

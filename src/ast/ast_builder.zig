@@ -32,6 +32,7 @@ const ast_data_mod = @import("ast_data.zig");
 const ast_utils = @import("ast_utils.zig");
 const tok_utils = @import("token_utils.zig");
 const expr_mod = @import("expression.zig");
+const type_parser = @import("type_parser.zig");
 const errors = @import("errors.zig");
 
 const Allocator = std.mem.Allocator;
@@ -953,179 +954,14 @@ fn parseTryStatement(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
 
 // helper: eat a ';' if one is sitting there
 fn consumeSemi(d: *ASTData) void {
-    if (!d.hasMore()) return;
-    const t = d.token_list.items[d.token_index];
-    if (t.token_type == TokenType.Semicolon) d.advance();
+    if (d.peekToken(0)) |t| {
+        if (t.token_type == TokenType.Semicolon) d.advance();
+    }
 }
 
 fn parseTypeNode(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
-    const type_node: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
-    type_node.node_type = ASTNodeType.VarType;
-
-    const tok = try d.getToken();
-    d.advance(); // consume the first token of the type
-
-    // ── modifiers that wrap another type ────────────────────────────────
-    // * T   pointer
-    // & T   reference (address-of in type position)
-    // ! T   failable (anonymous error)
-    // ? T   optional
-    // mut   mutable modifier (in param lists like `mut a: @Self`)
-    if (tok.token_type == TokenType.Star or
-        tok.token_type == TokenType.And or
-        tok.token_type == TokenType.ExclamationMark or
-        tok.token_type == TokenType.QuestionMark)
-    {
-        const inner = try parseTypeNode(allocator, d);
-        type_node.token = tok;
-        type_node.left = inner;
-        return type_node;
-    }
-
-    // mut in type position (param like `mut a: @Self` — mut already consumed by parseParams,
-    // but handle if we ever hit it here)
-    if (tok.token_type == TokenType.Mut) {
-        const inner = try parseTypeNode(allocator, d);
-        type_node.token = tok;
-        type_node.is_mut = true;
-        type_node.left = inner;
-        return type_node;
-    }
-
-    // ── [ T ]  or  [ T ; N ]  ─────────────────────────────────────────
-    if (tok.token_type == TokenType.LeftBracket) {
-        const inner = try parseTypeNode(allocator, d);
-        // optional size:  [T; N]
-        if (d.hasMore()) {
-            const nt = try d.getToken();
-            if (nt.token_type == TokenType.Semicolon) {
-                d.advance();
-                const size_tok = try d.getToken();
-                d.advance(); // consume the size literal
-                const size_node: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
-                size_node.node_type = ASTNodeType.IntegerLiteral;
-                size_node.token = size_tok;
-                type_node.middle = size_node;
-            }
-        }
-        const rb = try d.getToken();
-        if (rb.token_type == TokenType.RightBracket) d.advance();
-
-        type_node.node_type = ASTNodeType.ArrayType;
-        type_node.token = tok;
-        type_node.left = inner;
-        return type_node;
-    }
-
-    // ── vec[T]  map{K, V}  set{T} ─────────────────────────────────────
-    if (tok.token_type == TokenType.Identifier and
-        (std.mem.eql(u8, tok.value, "vec") or
-            std.mem.eql(u8, tok.value, "map") or
-            std.mem.eql(u8, tok.value, "set")))
-    {
-        const open = try d.getToken();
-        if (open.token_type == TokenType.LeftBracket or open.token_type == TokenType.LeftBrace) d.advance();
-        const inner = try parseTypeNode(allocator, d);
-        type_node.left = inner;
-
-        // map needs K and V
-        const after = try d.getToken();
-        if (after.token_type == TokenType.Comma) {
-            d.advance(); // eat ','
-            const inner2 = try parseTypeNode(allocator, d);
-            type_node.middle = inner2;
-        }
-
-        const close = try d.getToken();
-        if (close.token_type == TokenType.RightBracket or close.token_type == TokenType.RightBrace) d.advance();
-
-        type_node.token = tok;
-        return type_node;
-    }
-
-    // ── Error ! T  (named error union) ────────────────────────────────
-    // e.g. FileError!str  — tok is an Identifier "FileError"
-    if (tok.token_type == TokenType.Identifier) {
-        // peek: is the next token '!'? then it's ErrorType!ValueType
-        if (d.hasMore()) {
-            const maybe_excl = try d.getToken();
-            if (maybe_excl.token_type == TokenType.ExclamationMark) {
-                d.advance(); // eat '!'
-                const inner = try parseTypeNode(allocator, d);
-                type_node.token = tok; // the error type name
-                type_node.left = inner;
-                return type_node;
-            }
-        }
-        // plain identifier type name (user-defined type)
-        type_node.token = tok;
-        return type_node;
-    }
-
-    // ── error keyword without a name  ( !T bare anonymous error ) ─────
-    if (tok.token_type == TokenType.Error) {
-        const excl = try d.getToken();
-        if (excl.token_type == TokenType.ExclamationMark) d.advance();
-        const inner = try parseTypeNode(allocator, d);
-        type_node.token = tok;
-        type_node.left = inner;
-        return type_node;
-    }
-
-    // ── @ builtins: @Self, @Type, @Generic(T) ─────────────────────────
-    if (tok.token_type == TokenType.At) {
-        const name_tok = try d.getToken();
-        d.advance(); // eat the builtin name (Self, Type, Generic …)
-        type_node.token = name_tok; // e.g. "Self"
-
-        // @Generic(T) — consume the arg list
-        if (d.hasMore()) {
-            const lp = try d.getToken();
-            if (lp.token_type == TokenType.LeftParen) {
-                d.advance(); // eat '('
-                var depth: usize = 1;
-                var guard: usize = 0;
-                while (d.hasMore() and depth > 0) {
-                    guard += 1;
-                    if (guard > 1000) break;
-                    const t = try d.getToken();
-                    d.advance();
-                    if (t.token_type == TokenType.LeftParen) depth += 1;
-                    if (t.token_type == TokenType.RightParen) depth -= 1;
-                }
-            }
-        }
-        return type_node;
-    }
-
-    // ── primitive/built-in type keywords ─────────────────────────────
-    if (tok_utils.isVarType(tok.token_type)) {
-        // peek for  !  to handle `void!T` style (unusual, but spec mentions it)
-        if (d.hasMore()) {
-            const maybe_excl = try d.getToken();
-            if (maybe_excl.token_type == TokenType.ExclamationMark) {
-                d.advance();
-                const inner = try parseTypeNode(allocator, d);
-                type_node.token = tok;
-                type_node.left = inner;
-                return type_node;
-            }
-        }
-        type_node.token = tok;
-        return type_node;
-    }
-
-    // ── DotDot / DotDotDot for variadic params ─────────────────────────
-    if (tok.token_type == TokenType.DotDotDot) {
-        type_node.token = tok;
-        return type_node;
-    }
-
-    d.setError("Expected a type", tok);
-    return AstError.Unexpected_Type;
+    return type_parser.parseTypeNode(allocator, d);
 }
-
-// ── structs, enums, unions, type, error ────────────────────────────────
 
 fn parseStruct(allocator: *Allocator, d: *ASTData, is_pub: bool) AstError!*ASTNode {
     d.error_function = "parseStruct";
@@ -1149,26 +985,28 @@ fn parseStruct(allocator: *Allocator, d: *ASTData, is_pub: bool) AstError!*ASTNo
         const maybe_tilde: Token = try d.getToken();
         if (maybe_tilde.token_type == TokenType.TildeArrow) {
             d.advance(); // eat ~>
-            const trait_name: Token = try d.getToken();
-            if (trait_name.token_type == TokenType.Identifier) {
-                const trait_node: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
-                trait_node.node_type = ASTNodeType.Identifier;
-                trait_node.token = trait_name;
-                n.left = trait_node; // attach trait implementation
-                d.advance(); // eat trait name
-            } else {
-                d.setError("Expected trait name after ~>", trait_name);
-                return AstError.Unexpected_Type;
-            }
 
             // Multiple traits `~> TraitA, TraitB`
             while (d.hasMore()) {
+                const trait_name: Token = try d.getToken();
+                if (trait_name.token_type == TokenType.Identifier) {
+                    const trait_node: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
+                    trait_node.node_type = ASTNodeType.Identifier;
+                    trait_node.token = trait_name;
+
+                    // use children to store implemented behaviors
+                    if (n.children == null) n.children = try ast_utils.createChildList(allocator);
+                    try n.children.?.append(allocator.*, trait_node);
+
+                    d.advance(); // eat trait name
+                } else {
+                    d.setError("Expected behavior name after ~>", trait_name);
+                    return AstError.Unexpected_Type;
+                }
+
                 const comma: Token = try d.getToken();
                 if (comma.token_type == TokenType.Comma) {
                     d.advance();
-                    const nxt_trait: Token = try d.getToken();
-                    if (nxt_trait.token_type == TokenType.Identifier) d.advance();
-                    // we could chain these, but for now we just parse them out
                 } else {
                     break;
                 }
@@ -1359,6 +1197,30 @@ fn parseUnion(allocator: *Allocator, d: *ASTData, is_pub: bool) AstError!*ASTNod
     n.token = name_tok;
     n.is_pub = is_pub;
     n.children = try ast_utils.createChildList(allocator);
+
+    // Traits implementation: ~> TraitName
+    if (d.hasMore()) {
+        const maybe_tilde: Token = try d.getToken();
+        if (maybe_tilde.token_type == TokenType.TildeArrow) {
+            d.advance(); // eat ~>
+            while (d.hasMore()) {
+                const trait_name: Token = try d.getToken();
+                if (trait_name.token_type == TokenType.Identifier) {
+                    const trait_node: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
+                    trait_node.node_type = ASTNodeType.Identifier;
+                    trait_node.token = trait_name;
+                    try n.children.?.append(allocator.*, trait_node);
+                    d.advance();
+                }
+                const comma = try d.getToken();
+                if (comma.token_type == TokenType.Comma) {
+                    d.advance();
+                } else {
+                    break;
+                }
+            }
+        }
+    }
 
     const lb: Token = try d.getToken();
     if (lb.token_type != TokenType.LeftBrace) return AstError.Unexpected_Type;
@@ -1589,22 +1451,18 @@ fn parseBehave(allocator: *Allocator, d: *ASTData) AstError!*ASTNode {
         if (cur.token_type == TokenType.Func) {
             const m: *ASTNode = try parseFuncDecl(allocator, d, false);
             n.children.?.append(allocator.*, m) catch return AstError.Out_Of_Memory;
-        } else if (cur.token_type == TokenType.Identifier and std.mem.eql(u8, cur.value, "needs")) {
+        } else if (cur.token_type == TokenType.Needs) {
             d.advance(); // needs
             const field_name: Token = try d.getToken();
             d.advance();
             const col: Token = try d.getToken();
             if (col.token_type == TokenType.Colon) d.advance();
-            const type_tok: Token = try d.getToken();
-            d.advance();
+            const type_node: *ASTNode = try parseTypeNode(allocator, d);
 
             const req_n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
             req_n.node_type = ASTNodeType.StructField;
             req_n.token = field_name;
-            const t_n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
-            t_n.node_type = ASTNodeType.VarType;
-            t_n.token = type_tok;
-            req_n.left = t_n;
+            req_n.left = type_node;
             n.children.?.append(allocator.*, req_n) catch return AstError.Out_Of_Memory;
         } else if (cur.token_type == TokenType.Identifier) {
             const nx = d.peekToken(0);

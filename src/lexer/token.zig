@@ -69,6 +69,7 @@ pub const TokenType = enum {
     True, // true
     False, // false
     Async, // async — marks a function as asynchronous
+    Needs, // needs — for behave requirements
 
     // ── operators and separators ──────────────────────────────────────────
     Comment, // start of a comment
@@ -191,6 +192,7 @@ pub const TEST = "test";
 pub const TRUE = "true";
 pub const FALSE = "false";
 pub const ASYNC = "async";
+pub const NEEDS = "needs";
 
 // ── operator strings ──────────────────────────────────────────────────────────
 

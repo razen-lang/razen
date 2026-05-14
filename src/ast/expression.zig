@@ -10,6 +10,7 @@ const node_mod = @import("node.zig");
 const ast_data_mod = @import("ast_data.zig");
 const ast_utils = @import("ast_utils.zig");
 const tok_utils = @import("token_utils.zig");
+const type_parser = @import("type_parser.zig");
 const errors = @import("errors.zig");
 
 const Allocator = std.mem.Allocator;
@@ -126,6 +127,31 @@ pub fn parsePrimary(allocator: *Allocator, ast_data: *ASTData) AstError!?*ASTNod
             ast_data.advance();
             const name_tok = try ast_data.getToken();
             ast_data.advance();
+
+            // Zig-style @as(Type, value)
+            if (std.mem.eql(u8, name_tok.value, "as")) {
+                const lp = try ast_data.getToken();
+                if (lp.token_type == TokenType.LeftParen) {
+                    ast_data.advance(); // eat '('
+                    const target_type = try type_parser.parseTypeNode(allocator, ast_data);
+
+                    const comma = try ast_data.getToken();
+                    if (comma.token_type == TokenType.Comma) ast_data.advance();
+
+                    const value_expr = try parseBinaryExpr(allocator, ast_data, 0);
+
+                    const rp = try ast_data.getToken();
+                    if (rp.token_type == TokenType.RightParen) ast_data.advance();
+
+                    const as_n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
+                    as_n.node_type = ASTNodeType.BuiltinExpression;
+                    as_n.token = name_tok;
+                    as_n.left = target_type;
+                    as_n.right = value_expr orelse return AstError.Unexpected_Type;
+                    return as_n;
+                }
+            }
+
             const n: *ASTNode = try ast_utils.createDefaultAstNode(allocator);
             n.node_type = ASTNodeType.Annotation;
             n.token = name_tok;
