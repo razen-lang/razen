@@ -1,46 +1,52 @@
-# razen
+# Razen
 
-A meaningful, simple, and accurate programming language built for maximum performance with no hidden magic.
+Razen is a systems language. No magic, no hidden costs, and no implicit behavior. It's built for people who want total control over the hardware.
 
-## Installation:
+## What is Razen for?
 
-### Build from Source
+Razen is designed for modern, performance-critical software:
+- **AI/ML**: High-speed tensor ops and model infra.
+- **Servers**: Low-latency, high-concurrency backends.
+- **Apps**: Core logic that needs to be lean and fast.
 
-> **Note:** You need to have zig installed on your system. You can download it from [ziglang.org](https://ziglang.org/).
+**The goal: Meaningful, Accurate, Simple, Maximum Performance.**
 
-1. Clone the github repo:
+## Quick Start
 
-```bash
-git clone https://github.com/razen-lang/razen.git
+```razen
+func main() -> void {
+    fmt.println("Hello, Razen!")
+}
 ```
 
-2. Build the project:
+## Build and Run
 
+### Requirements
+- **Zig**: Required to build the compiler. Get it at [ziglang.org](https://ziglang.org/).
+
+### Build
 ```bash
+git clone https://github.com/razen-lang/razen.git
 cd razen
 zig build run
 ```
 
-## Updating:
-
-1. Fetch the latest changes from the github repo:
-
-```bash
-git fetch
-```
-
-2. Pull the changes:
-
+### Update
 ```bash
 git pull
-```
-
-3. Build the project:
-
-```bash
 zig build run
 ```
 
-**LICENSE:** Apache 2.0 License
+## Docs & Progress
 
-**Creator:** [Prathmesh Barot](https://github.com/prathmesh-barot)
+Everything is documented in the `/docs` folder. If you want to see what's left to build, check `ROADMAP.md`.
+
+- [Introduction](./docs/introduction.md)
+- [Basics](./docs/basics.md)
+- [Types](./docs/types.md)
+- [Roadmap](./ROADMAP.md)
+
+## License
+Apache 2.0
+
+**Creator**: [Prathmesh Barot](https://github.com/prathmesh-barot)
