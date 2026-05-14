@@ -13,6 +13,9 @@ const ConvertData = convert_data_mod.ConvertData;
 const StringBuilder = convert_data_mod.StringBuilder;
 const ConvertError = @import("../errors.zig").ConvertError;
 const llvm_function = @import("llvm_function.zig");
+const std_fmt = @import("../../std/fmt.zig");
+const std_os = @import("../../std/os.zig");
+const std_debug = @import("../../std/debug.zig");
 const print = std.debug.print;
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
@@ -51,11 +54,15 @@ pub fn convert(
     // Standard libc declarations for builtins and std library
     generated_code.appendLine(allocator, "declare i32 @printf(i8* nocapture, ...)") catch return ConvertError.Out_Of_Memory;
     generated_code.appendLine(allocator, "declare i32 @puts(i8* nocapture)") catch return ConvertError.Out_Of_Memory;
-    generated_code.appendLine(allocator, "declare i32 @print(i32)") catch return ConvertError.Out_Of_Memory;
-    generated_code.appendLine(allocator, "declare i32 @println(i32)") catch return ConvertError.Out_Of_Memory;
-    generated_code.appendLine(allocator, "declare i32 @exit(i32)") catch return ConvertError.Out_Of_Memory;
-    generated_code.appendLine(allocator, "declare i32 @assert(i32)") catch return ConvertError.Out_Of_Memory;
-    generated_code.appendLine(allocator, "declare i32 @panic(i8*)") catch return ConvertError.Out_Of_Memory;
+    generated_code.appendLine(allocator, "declare void @exit(i32)") catch return ConvertError.Out_Of_Memory;
+    generated_code.appendLine(allocator, "declare void @abort()") catch return ConvertError.Out_Of_Memory;
+    generated_code.appendLine(allocator, "") catch return ConvertError.Out_Of_Memory;
+
+    // ── std library LLVM IR definitions ─────────────────────────────────────
+    for ([_][]const u8{ std_fmt.ir, std_os.ir, std_debug.ir }) |ir| {
+        generated_code.append(allocator, ir) catch return ConvertError.Out_Of_Memory;
+        generated_code.append(allocator, "\n") catch return ConvertError.Out_Of_Memory;
+    }
     generated_code.appendLine(allocator, "") catch return ConvertError.Out_Of_Memory;
 
     // ── walk top-level nodes ───────────────────────────────────────────────

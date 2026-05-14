@@ -137,9 +137,7 @@ pub const TypeInfo = struct {
                 }
                 return other.name == null;
             },
-            TypeCategory.Bool, TypeCategory.Char, TypeCategory.Void,
-            TypeCategory.Noret, TypeCategory.Str, TypeCategory.String,
-            TypeCategory.Any, TypeCategory.Unknown => return true,
+            TypeCategory.Bool, TypeCategory.Char, TypeCategory.Void, TypeCategory.Noret, TypeCategory.Str, TypeCategory.String, TypeCategory.Any, TypeCategory.Unknown => return true,
             TypeCategory.Named => {
                 if (self.name) |sn| {
                     if (other.name) |on| return std.mem.eql(u8, sn, on);

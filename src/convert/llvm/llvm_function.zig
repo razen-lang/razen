@@ -41,6 +41,7 @@ pub fn processFunctionDeclaration(
         convert_data.block_terminated = false;
         try llvm_body.processBody(allocator, convert_data, body);
         if (!convert_data.block_terminated) {
+            try llvm_body.flushDeferredStmts(allocator, convert_data);
             const ret_type = convert_data.current_ret_type orelse "void";
             if (std.mem.eql(u8, ret_type, "void")) {
                 convert_data.generated_code.appendLine(allocator, "\tret void") catch return ConvertError.Out_Of_Memory;

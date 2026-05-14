@@ -222,14 +222,46 @@ fn flattenBinaryExpression(
 // Function call
 // --------------------------------------------------------------------------
 
+fn resolveFnName(node: *ASTNode) ?[]const u8 {
+    // If node has a direct identifier token, use it
+    if (node.token) |tok| {
+        if (!std.mem.eql(u8, tok.value, "(")) return tok.value;
+    }
+    // Walk the left chain (MemberAccess) to find the function name
+    if (node.left) |left| {
+        var cur = left;
+        while (cur.node_type == .MemberAccess) {
+            if (cur.right) |r| {
+                if (r.token) |tok| return tok.value;
+                cur = r;
+            } else {
+                break;
+            }
+        }
+        if (cur.token) |tok| return tok.value;
+    }
+    return null;
+}
+
+fn stdFnName(name: []const u8) []const u8 {
+    if (std.mem.eql(u8, name, "print")) return "std_print";
+    if (std.mem.eql(u8, name, "println")) return "std_println";
+    if (std.mem.eql(u8, name, "exit")) return "std_exit";
+    if (std.mem.eql(u8, name, "assert")) return "std_assert";
+    if (std.mem.eql(u8, name, "panic")) return "std_panic";
+    if (std.mem.eql(u8, name, "clock_ms")) return "std_clock_ms";
+    if (std.mem.eql(u8, name, "clock_ns")) return "std_clock_ns";
+    return name;
+}
+
 fn flattenFunctionCall(
     allocator: *Allocator,
     convert_data: *ConvertData,
     node: *ASTNode,
     statements: *ArrayList([]const u8),
 ) ConvertError![]const u8 {
-    if (node.token == null) return ConvertError.Node_Is_Null;
-    const fn_name = node.token.?.value;
+    const raw_name = resolveFnName(node) orelse return ConvertError.Node_Is_Null;
+    const fn_name = stdFnName(raw_name);
 
     var args_buf = std.ArrayList(u8).initCapacity(allocator.*, 0) catch return ConvertError.Out_Of_Memory;
 

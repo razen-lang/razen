@@ -18,6 +18,27 @@ const llvm_return = @import("llvm_return.zig");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
+/// Flush all deferred statements in LIFO order before a return/break.
+pub fn flushDeferredStmts(
+    allocator: *Allocator,
+    convert_data: *ConvertData,
+) ConvertError!void {
+    const stmts = &convert_data.deferred_stmts;
+    if (stmts.items.len == 0) return;
+    var i: usize = stmts.items.len;
+    while (i > 0) {
+        i -= 1;
+        const body = stmts.items[i];
+        convert_data.generated_code.appendLine(allocator, "\t; defer") catch return ConvertError.Out_Of_Memory;
+        if (body.node_type == .Block) {
+            try processBody(allocator, convert_data, body);
+        } else {
+            try processFunctionBodyNode(allocator, convert_data, body);
+        }
+    }
+    stmts.clearRetainingCapacity();
+}
+
 /// Walk every child of a body/block node and emit IR for each statement.
 pub fn processBody(
     allocator: *Allocator,
@@ -45,7 +66,12 @@ fn processFunctionBodyNode(
     node: *ASTNode,
 ) ConvertError!void {
     switch (node.node_type) {
-        .ReturnStatement => try llvm_return.processReturn(allocator, convert_data, node),
+        .ReturnStatement => {
+            if (node.token == null or (!std.mem.eql(u8, node.token.?.value, "break") and !std.mem.eql(u8, node.token.?.value, "skip"))) {
+                try flushDeferredStmts(allocator, convert_data);
+            }
+            try llvm_return.processReturn(allocator, convert_data, node);
+        },
         .VarDeclaration, .ConstDeclaration => try processLocalDecl(allocator, convert_data, node),
         .Assignment => try processAssignment(allocator, convert_data, node),
         .IfStatement => try processIf(allocator, convert_data, node),
@@ -53,8 +79,15 @@ fn processFunctionBodyNode(
         .FunctionCall, .MemberAccess => try processCallStmt(allocator, convert_data, node),
         .Block, .IfBody, .ElseBody, .LoopBody => try processBody(allocator, convert_data, node),
         .Comment => {},
+        // ── defer — push body onto deferred stmts stack (LIFO flush) ───
+        .DeferStatement => {
+            if (node.left) |body| {
+                convert_data.deferred_stmts.append(allocator.*, body) catch return ConvertError.Out_Of_Memory;
+            }
+        },
+
         // Not yet implemented — emit a comment and keep going
-        .TryExpression, .CatchExpression, .DeferStatement, .MatchStatement, .MatchCase, .MatchBody, .BuiltinExpression => {
+        .TryExpression, .CatchExpression, .MatchStatement, .MatchCase, .MatchBody, .BuiltinExpression => {
             convert_data.generated_code.appendFmt(
                 allocator,
                 "\t; TODO: {s}\n",

@@ -78,6 +78,11 @@ pub fn processReturn(
     }
 
     const ret_type = convert_data.current_ret_type orelse "i32";
-    convert_data.generated_code.appendFmt(allocator, "\tret {s} {s}\n", .{ ret_type, final_value }) catch return ConvertError.Out_Of_Memory;
+    const ret_value = if (std.mem.eql(u8, ret_type, "i1")) blk: {
+        const trunc_reg = try llvm_flatten.freshReg(allocator, convert_data);
+        convert_data.generated_code.appendFmt(allocator, "\t{s} = trunc i32 {s} to i1\n", .{ trunc_reg, final_value }) catch return ConvertError.Out_Of_Memory;
+        break :blk trunc_reg;
+    } else final_value;
+    convert_data.generated_code.appendFmt(allocator, "\tret {s} {s}\n", .{ ret_type, ret_value }) catch return ConvertError.Out_Of_Memory;
     convert_data.block_terminated = true;
 }

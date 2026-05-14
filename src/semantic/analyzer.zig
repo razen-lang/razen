@@ -177,9 +177,9 @@ pub const Analyzer = struct {
                     if (params_node.children) |params| sym.param_count = params.items.len;
                 }
                 if (node.left) |ret_type_node| {
-                if (ret_type_node.node_type == ASTNodeType.ReturnType and ret_type_node.left != null) {
-                    sym.return_type = self.resolveTypeFromNode(ret_type_node.left.?);
-                }
+                    if (ret_type_node.node_type == ASTNodeType.ReturnType and ret_type_node.left != null) {
+                        sym.return_type = self.resolveTypeFromNode(ret_type_node.left.?);
+                    }
                 }
                 if (!self.sym_table.defineGlobal(sym)) {
                     self.reportError(tok, "'{s}' is already declared in this scope.", .{name});
@@ -282,8 +282,11 @@ pub const Analyzer = struct {
             ASTNodeType.ConstDeclaration => {
                 const sym = try self.allocator.create(Symbol);
                 sym.* = Symbol{
-                    .name = name, .symbol_type = SymbolType.Variable,
-                    .token = tok, .is_mut = node.is_mut, .is_const = true,
+                    .name = name,
+                    .symbol_type = SymbolType.Variable,
+                    .token = tok,
+                    .is_mut = node.is_mut,
+                    .is_const = true,
                 };
                 if (node.left) |type_node| sym.resolved_type = self.resolveTypeFromNode(type_node);
                 if (!self.sym_table.defineGlobal(sym)) {
@@ -353,9 +356,7 @@ pub const Analyzer = struct {
                 if (node.left) |l| return try self.anaNode(l);
                 return null;
             },
-            ASTNodeType.IntegerLiteral, ASTNodeType.FloatLiteral,
-            ASTNodeType.BoolLiteral, ASTNodeType.CharLiteral,
-            ASTNodeType.StringLiteral => return self.inferTypeFromLiteral(node),
+            ASTNodeType.IntegerLiteral, ASTNodeType.FloatLiteral, ASTNodeType.BoolLiteral, ASTNodeType.CharLiteral, ASTNodeType.StringLiteral => return self.inferTypeFromLiteral(node),
             ASTNodeType.BuiltinExpression => return null,
             ASTNodeType.ArrayLiteral => {
                 if (node.children) |children| {
@@ -476,9 +477,12 @@ pub const Analyzer = struct {
         } else {
             const sym = try self.allocator.create(Symbol);
             sym.* = Symbol{
-                .name = name, .symbol_type = SymbolType.Variable,
-                .resolved_type = decl_type, .token = tok,
-                .is_mut = node.is_mut, .is_const = node.is_const,
+                .name = name,
+                .symbol_type = SymbolType.Variable,
+                .resolved_type = decl_type,
+                .token = tok,
+                .is_mut = node.is_mut,
+                .is_const = node.is_const,
             };
             _ = self.sym_table.define(sym);
         }
