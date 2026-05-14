@@ -4,6 +4,7 @@ const critical_samples = @import("samples/sample3.zig");
 const phase3_samples = @import("samples/sample4.zig");
 const feature_samples = @import("samples/sample5.zig");
 const semantic_samples = @import("samples/semantic_test.zig");
+const error_samples = @import("samples/semantic_errors.zig");
 const parser = @import("parser/parser.zig");
 const lexer = @import("lexer/lexer.zig");
 const token = @import("lexer/token.zig");
@@ -72,45 +73,18 @@ pub fn main() void {
     print("{s}Razen Lang — Full Pipeline Test{s}\n", .{ lexer.LIGHT_GREEN, lexer.RESET });
     print("{s}std API: std.fmt.print/println | std.os.exit | std.debug.assert/panic{s}\n\n", .{ lexer.GREY, lexer.RESET });
 
-    // ── Core samples (all produce valid LLVM IR) ─────────────────────────
-    convertCode("RETURN_ZERO", code_samples.RETURN_ZERO);
-    convertCode("ARITH_EXPR", code_samples.ARITH_EXPR);
-    convertCode("IF_ELSE", code_samples.IF_ELSE);
+    // ── Test single sample with runtime ─────────────────────────────────
     convertCode("FULL_PROGRAM", code_samples.FULL_PROGRAM);
-    convertCode("PHASE_2_EXHAUSTIVE", code_samples.PHASE_2_EXHAUSTIVE);
 
-    // ── Critical-bug fix samples (all produce valid LLVM IR) ─────────────
-    convertCode("C1: DEFER ORDER", critical_samples.DEFER_ORDER);
-    convertCode("C1: DEFER BEFORE RETURN", critical_samples.DEFER_BEFORE_RETURN);
-    convertCode("C2: TRY/CATCH", critical_samples.TRY_CATCH_BASIC);
-    convertCode("C3: TAGGED UNION", critical_samples.TAGGED_UNION);
-    convertCode("C3: TAGGED UNION STRUCT VARIANT", critical_samples.TAGGED_UNION_STRUCT_VARIANT);
-    convertCode("C4: @SELF IN BEHAVE", critical_samples.SELF_IN_BEHAVE);
-    convertCode("C5: USE PATH DOTS", critical_samples.USE_PATH);
-    convertCode("STD.DEBUG ASSERT+PANIC", critical_samples.DEBUG_ASSERT);
-    convertCode("STD.OS EXIT+CLOCK", critical_samples.OS_SAMPLE);
-    convertCode("STRUCT+MATCH+DEFER", critical_samples.STRUCT_MATCH_DEFER);
-
-    // ── Phase 3: C6/C7/C8 critical fixes ────────────────────────────────
-    // C6: semantic error — 'v' undeclared in match payload binding
-    // convertCode("C6: MATCH PAYLOAD BINDING", phase3_samples.MATCH_PAYLOAD);
-    convertCode("C7: UNION CONSTRUCTOR", phase3_samples.UNION_CONSTRUCTOR);
-    convertCode("C8: ASSIGNMENT IN MATCH", phase3_samples.ASSIGNMENT_IN_MATCH);
-    // COMBINED C6+C7+C8: depends on C6
-    // convertCode("COMBINED C6+C7+C8", phase3_samples.COMBINED_C6_C7_C8);
-
-    // ── Important Features F1-F16 ─────────────────────────────────
-    // F1: semantic error — 'null' undeclared in optional return
-    // convertCode("F1: OPTIONAL ?T", feature_samples.OPTIONAL_TYPE);
-    // F2: semantic error — 'FileError' not resolved as error type
-    // convertCode("F2: ERROR UNION RETURN", feature_samples.ERROR_UNION_RETURN);
-    convertCode("F4: ENUM BACKING TYPE", feature_samples.ENUM_BACKING_TYPE);
-    convertCode("F5: BIT FLAG ENUM", feature_samples.ENUM_BIT_FLAGS);
-    convertCode("F9: PUB VISIBILITY", feature_samples.PUB_VISIBILITY);
-    convertCode("F10: CONST FUNC", feature_samples.CONST_FUNC);
-    convertCode("F13: FORMAT STRINGS", feature_samples.FORMAT_STRING);
-    convertCode("F16: REFERENCES &x / ptr.*", feature_samples.REFERENCES);
-    convertCode("F8: BEHAVE NEEDS FIELDS", feature_samples.BEHAVE_NEEDS);
-    convertCode("F12: ALLOCATOR BUILTINS", feature_samples.ALLOCATOR_BUILTINS);
-    convertCode("COMBINED F4+F5+F9+F10+F13", feature_samples.COMBINED_FEATURES);
+    // To test error detection, uncomment below:
+    // convertCode("S01_IMMUTABLE_ASSIGN", error_samples.S01_IMMUTABLE_ASSIGN);
+    // convertCode("S02_REDECLARED_VAR", error_samples.S02_REDECLARED_VAR);
+    // convertCode("S03_UNDECLARED_IDENT", error_samples.S03_UNDECLARED_IDENT);
+    // convertCode("S04_ARG_COUNT_MISMATCH", error_samples.S04_ARG_COUNT_MISMATCH);
+    // convertCode("S05_RETURN_TYPE_MISMATCH", error_samples.S05_RETURN_TYPE_MISMATCH);
+    // convertCode("S06_BREAK_OUTSIDE_LOOP", error_samples.S06_BREAK_OUTSIDE_LOOP);
+    // convertCode("S07_IF_COND_NOT_BOOL", error_samples.S07_IF_COND_NOT_BOOL);
+    // convertCode("S08_STRUCT_FIELD_NOT_FOUND", error_samples.S08_STRUCT_FIELD_NOT_FOUND);
+    // convertCode("S09_UNDECLARED_FUNC", error_samples.S09_UNDECLARED_FUNC);
+    // convertCode("S10_GLOBAL_DUPLICATE", error_samples.S10_GLOBAL_DUPLICATE);
 }
