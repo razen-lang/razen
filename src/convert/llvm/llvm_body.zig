@@ -204,10 +204,10 @@ fn processAssignment(
             op_stripped = op[0 .. op.len - 1];
         }
 
-        if (llvm_utils.convertToLLVMOperator(op_stripped)) |instr| {
+        if (llvm_utils.convertToLLVMOperator(op_stripped, llvm_type)) |instr| {
             const new_reg = try llvm_flatten.freshReg(allocator, convert_data);
-            convert_data.generated_code.appendFmt(allocator, "\t{s} = {s} {s}, {s}\n", .{
-                new_reg, instr, old_reg, val,
+            convert_data.generated_code.appendFmt(allocator, "\t{s} = {s} {s} {s}, {s}\n", .{
+                new_reg, instr, llvm_type, old_reg, val,
             }) catch return ConvertError.Out_Of_Memory;
 
             convert_data.generated_code.appendFmt(allocator, "\tstore {s} {s}, {s}* {s}\n", .{
@@ -249,8 +249,13 @@ fn processIf(
         convert_data.generated_code.appendFmt(allocator, "\t{s}\n", .{s}) catch return ConvertError.Out_Of_Memory;
     }
 
+    const cond_type = llvm_flatten.resolveExprLLVMType(convert_data, cond_node);
     const cond_i1 = try llvm_flatten.freshReg(allocator, convert_data);
-    convert_data.generated_code.appendFmt(allocator, "\t{s} = trunc i32 {s} to i1\n", .{ cond_i1, cond_val }) catch return ConvertError.Out_Of_Memory;
+    if (std.mem.eql(u8, cond_type, "i1")) {
+        convert_data.generated_code.appendFmt(allocator, "\t{s} = {s}\n", .{ cond_i1, cond_val }) catch return ConvertError.Out_Of_Memory;
+    } else {
+        convert_data.generated_code.appendFmt(allocator, "\t{s} = trunc {s} {s} to i1\n", .{ cond_i1, cond_type, cond_val }) catch return ConvertError.Out_Of_Memory;
+    }
 
     const then_lbl = try freshLabel(allocator, convert_data);
     const merge_lbl = try freshLabel(allocator, convert_data);

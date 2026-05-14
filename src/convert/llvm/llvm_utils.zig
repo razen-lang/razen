@@ -1,6 +1,3 @@
-// llvm_utils.zig — type and operator mapping for Razen → LLVM IR.
-// Mirrors the tutorial's llvm_utils.zig, adapted to Razen's token field names.
-
 const lexer = @import("../../lexer/lexer.zig");
 const token_mod = @import("../../lexer/token.zig");
 const node_mod = @import("../../ast/node.zig");
@@ -9,7 +6,6 @@ const TokenType = token_mod.TokenType;
 const ASTNode = node_mod.ASTNode;
 
 /// Resolve a type node chain to its LLVM IR type string.
-/// Handles pointer/reference types (token is `*` or `&`).
 pub fn resolveTypeNode(type_node: *ASTNode) []const u8 {
     if (type_node.token) |tok| {
         if (tok.token_type == TokenType.Star or tok.token_type == TokenType.And)
@@ -23,10 +19,7 @@ pub fn resolveTypeNode(type_node: *ASTNode) []const u8 {
     return "i32";
 }
 
-/// Map a Razen Token to its LLVM IR type string.
-/// Returns null when no direct mapping exists.
 pub fn convertToLLVMType(tok: Token) ?[]const u8 {
-    // Razen uses tok.token_type (not tok.Type as in the tutorial)
     return switch (tok.token_type) {
         .I1, .U1 => "i1",
         .I2, .U2 => "i2",
@@ -46,31 +39,51 @@ pub fn convertToLLVMType(tok: Token) ?[]const u8 {
     };
 }
 
-/// Map a Razen binary operator string to an LLVM integer instruction
-/// (includes type suffix, e.g. "add i32" — matching the tutorial style).
-pub fn convertToLLVMOperator(op: []const u8) ?[]const u8 {
-    if (eql(op, "+")) return "add i32";
-    if (eql(op, "-")) return "sub i32";
-    if (eql(op, "*")) return "mul i32";
-    if (eql(op, "/")) return "sdiv i32";
-    if (eql(op, "%")) return "srem i32";
-    if (eql(op, "&")) return "and i32";
-    if (eql(op, "|")) return "or i32";
-    if (eql(op, "^")) return "xor i32";
-    if (eql(op, "<<")) return "shl i32";
-    if (eql(op, ">>")) return "ashr i32";
+/// Returns the LLVM instruction name for a Razen operator.
+/// Does NOT include the type suffix — caller formats with the type.
+pub fn convertToLLVMOperator(op: []const u8, llvm_type: []const u8) ?[]const u8 {
+    if (isFloatType(llvm_type)) {
+        if (eql(op, "+")) return "fadd";
+        if (eql(op, "-")) return "fsub";
+        if (eql(op, "*")) return "fmul";
+        if (eql(op, "/")) return "fdiv";
+        return null;
+    }
+    if (eql(op, "+")) return "add";
+    if (eql(op, "-")) return "sub";
+    if (eql(op, "*")) return "mul";
+    if (eql(op, "/")) return "sdiv";
+    if (eql(op, "%")) return "srem";
+    if (eql(op, "&")) return "and";
+    if (eql(op, "|")) return "or";
+    if (eql(op, "^")) return "xor";
+    if (eql(op, "<<")) return "shl";
+    if (eql(op, ">>")) return "ashr";
     return null;
 }
 
-/// Map a comparison operator to an `icmp` predicate (signed).
-pub fn convertToLLVMCmp(op: []const u8) ?[]const u8 {
-    if (eql(op, "==")) return "icmp eq i32";
-    if (eql(op, "!=")) return "icmp ne i32";
-    if (eql(op, "<")) return "icmp slt i32";
-    if (eql(op, "<=")) return "icmp sle i32";
-    if (eql(op, ">")) return "icmp sgt i32";
-    if (eql(op, ">=")) return "icmp sge i32";
+/// Returns the full LLVM IR comparison predicate and type for a Razen comparison op.
+pub fn convertToLLVMCmp(op: []const u8, llvm_type: []const u8) ?[]const u8 {
+    if (isFloatType(llvm_type)) {
+        if (eql(op, "==")) return "fcmp oeq";
+        if (eql(op, "!=")) return "fcmp one";
+        if (eql(op, "<")) return "fcmp olt";
+        if (eql(op, "<=")) return "fcmp ole";
+        if (eql(op, ">")) return "fcmp ogt";
+        if (eql(op, ">=")) return "fcmp oge";
+        return null;
+    }
+    if (eql(op, "==")) return "icmp eq";
+    if (eql(op, "!=")) return "icmp ne";
+    if (eql(op, "<")) return "icmp slt";
+    if (eql(op, "<=")) return "icmp sle";
+    if (eql(op, ">")) return "icmp sgt";
+    if (eql(op, ">=")) return "icmp sge";
     return null;
+}
+
+pub fn isFloatType(t: []const u8) bool {
+    return eql(t, "half") or eql(t, "float") or eql(t, "double") or eql(t, "fp128");
 }
 
 fn eql(a: []const u8, b: []const u8) bool {

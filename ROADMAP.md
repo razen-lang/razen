@@ -245,9 +245,9 @@
 - ✓ Float literals
 - ✓ Bool literals (true→"1", false→"0")
 - ✓ Char literals (raw byte value)
-- ◐ String literals — **BROKEN:** returns `"0"` placeholder
+- ✓ String literals — emit global `@.str.N` constants + GEP pointer
 - ✓ Identifier resolution (local load, param ref, global const)
-- ◐ Binary arithmetic: +, -, *, /, % → i32 ops
+- ◐ Binary arithmetic: +, -, *, /, % → type-aware ops (falls back to i32)
 - ◐ Binary comparison: ==, !=, <, <=, >, >= → icmp + zext + trunc
 - ✓ Binary logical: && (and i1), || (or i1)
 - ✓ Binary bitwise: & (and), | (or), ^ (xor), << (shl), >> (ashr)
@@ -556,15 +556,16 @@
 These are the top-priority items that block Razen from being useful beyond i32 arithmetic.
 
 ### P0 — Must Fix
-- ◐ **String literals emit `"0"`** — StringLiteral flatten needs to emit global string constants and return a pointer. Blocks all user-facing output.
+- ✓ **String literals emit global constants** — StringLiteral flatten emits `@.str.N` global constants + GEP, returns `i8*`. `std_print`/`std_println` accept `i8*` with `printf("%s")`.
 - ☐ **Member access returns `"0"`** — MemberAccess flatten needs GEP. Blocks struct field access, method calls on structs.
-- ◐ **All operations hardcode i32** — resolveTypeNode falls back to "i32". Binary ops emit i32 regardless of actual type. Blocks all non-i32 types.
+- ◐ **All operations hardcode i32** — resolveTypeNode falls back to "i32". Binary ops emit i32 regardless of actual type. Blocks all non-i32 types. **Improved: type-aware operators use resolveExprLLVMType, fallback to i32.**
 
 ### P1 — High Priority
-- ☐ **Struct codegen** — `%T = type { ... }`, GEP, field store/load. Blocks Option, Result, Vec, Map, String, allocators — virtually everything in std.
+- ☐ **Member access returns `"0"`** — MemberAccess flatten needs GEP. Blocks struct field access.
+- ☐ **Struct codegen** — `%T = type { ... }`, GEP, field store/load. Blocks Option, Result, Vec, Map, String, allocators.
 - ☐ **Enum codegen** — integer mapping and switch dispatch. Blocks Ordering, error codes, state machines.
 - ☐ **Match statement codegen** — switch/icmp chain with payload extraction. Blocks exhaustive enum handling.
-- ◐ **Float ops emit i32** — fadd/fsub/fmul/fdiv/fcmp needed. Blocks all float arithmetic.
+- ☐ **Float ops emit i32** — fadd/fsub/fmul/fdiv/fcmp needed. Blocks all float arithmetic.
 
 ### P2 — Medium Priority
 - ☐ **Error union codegen** — success flag + payload. Blocks try/catch.
@@ -596,11 +597,12 @@ These are the top-priority items that block Razen from being useful beyond i32 a
 ## Priority Pipeline
 
 ### P0 — Blocking Everything Else (Codegen)
-- ☐ **String literal support** — emit global `@.str.N` constants, return `i8*`, update `puts` calls
-- ☐ **Type-correct operations** — use actual LLVM types for arithmetic/comparison/logical instead of hardcoded `i32`
+- ✓ **String literal support** — emit global `@.str.N` constants, return `i8*`, `std_print`/`std_println` use `printf("%s")`
+- ◐ **Type-correct operations** — type-aware operators (resolveExprLLVMType), falls back to `i32` for unknown types
 - ☐ **Struct codegen** — `%T = type { ... }`, `getelementptr` (GEP), field access, construction
 
 ### P1 — Core Usability
+- ☐ **Member access codegen** — GEP for `a.b` field access
 - ☐ **Match statement codegen** — switch/icmp chain with payload extraction
 - ☐ **Enum codegen** — integer mapping, discriminant, switch dispatch
 - ☐ **Float arithmetic** — fadd/fsub/fmul/fdiv/fcmp for f32/f64
@@ -623,7 +625,7 @@ These are the top-priority items that block Razen from being useful beyond i32 a
 | Milestone | Description | Key Deliverables |
 |-----------|-------------|------------------|
 | M0 | Working pipeline | ✓ Full 4-phase pipeline with complete semantic analysis |
-| M1 | String support | String literals, print/println with messages, std.fmt basics |
+| M1 | String support | ✓ String literals, print/println with messages, std.fmt basics |
 | M2 | Struct codegen | Struct types, field access, methods — unblocks ~80% of std |
 | M3 | Type correctness | All types generate correct LLVM IR (not just i32) |
 | M4 | Enum + Match | Enumerations compile, match dispatches correctly |
@@ -644,6 +646,6 @@ These are the top-priority items that block Razen from being useful beyond i32 a
 
 ---
 
-**Progress:** 42% of Stage 1-4 compiler core complete.
+**Progress:** 44% of Stage 1-4 compiler core complete.
 **Std Library:** 5% complete (7 of ~140 functions).
-**Next Target (P0):** String literal support, type-correct operations, struct codegen.
+**Next Target (P0):** Member access GEP, type-correct operations (full), struct codegen.

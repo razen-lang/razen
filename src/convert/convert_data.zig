@@ -83,6 +83,10 @@ pub const ConvertData = struct {
     // populated as unions are emitted; used for tagged-union match and construction.
     union_registry: std.StringHashMap(std.StringHashMap([]const u8)),
 
+    // string literal value -> LLVM global constant name (e.g. @.str.0)
+    // populated during pre-scan, used during flattenExpression for StringLiteral nodes.
+    string_constants: std.StringHashMap([]const u8),
+
     pub fn getNode(self: *ConvertData) ?*ASTNode {
         if (self.node_index >= self.ast_nodes.items.len) return null;
         return self.ast_nodes.items[self.node_index];

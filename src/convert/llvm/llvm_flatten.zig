@@ -53,8 +53,19 @@ pub fn flattenExpression(
         .StringLiteral => {
             if (node.token == null) return ConvertError.Node_Is_Null;
             const s = node.token.?.value;
-            _ = s;
-            return "0";
+            const const_name = convert_data.string_constants.get(s) orelse {
+                convert_data.error_detail = "String literal not pre-registered";
+                return ConvertError.Unimplemented_Node_Type;
+            };
+            const gep_reg = try freshReg(allocator, convert_data);
+            const len = s.len + 1;
+            const gep_line = std.fmt.allocPrint(
+                allocator.*,
+                "{s} = getelementptr [{d} x i8], [{d} x i8]* {s}, i32 0, i32 0",
+                .{ gep_reg, len, len, const_name },
+            ) catch return ConvertError.Out_Of_Memory;
+            statements.append(allocator.*, gep_line) catch return ConvertError.Out_Of_Memory;
+            return gep_reg;
         },
 
         // -- identifier (variable / parameter) ------------------------------
@@ -101,16 +112,17 @@ pub fn flattenExpression(
             const operand_node = node.right orelse node.left orelse return ConvertError.Node_Is_Null;
             const sub = try flattenExpression(allocator, convert_data, operand_node, no_strings, statements);
 
+            const unary_type = resolveExprLLVMType(convert_data, operand_node);
             // Pointer dereference ptr.* -- emit load
             if (std.mem.eql(u8, op, ".*")) {
                 const reg = try freshReg(allocator, convert_data);
-                const line = std.fmt.allocPrint(allocator.*, "{s} = load i32, i32* {s}", .{ reg, sub }) catch return ConvertError.Out_Of_Memory;
+                const line = std.fmt.allocPrint(allocator.*, "{s} = load {s}, {s}* {s}", .{ reg, unary_type, unary_type, sub }) catch return ConvertError.Out_Of_Memory;
                 statements.append(allocator.*, line) catch return ConvertError.Out_Of_Memory;
                 return reg;
             }
             if (std.mem.eql(u8, op, "-")) {
                 const reg = try freshReg(allocator, convert_data);
-                const line = std.fmt.allocPrint(allocator.*, "{s} = sub i32 0, {s}", .{ reg, sub }) catch return ConvertError.Out_Of_Memory;
+                const line = std.fmt.allocPrint(allocator.*, "{s} = sub {s} 0, {s}", .{ reg, unary_type, sub }) catch return ConvertError.Out_Of_Memory;
                 statements.append(allocator.*, line) catch return ConvertError.Out_Of_Memory;
                 return reg;
             }
@@ -148,6 +160,18 @@ pub fn flattenExpression(
 // Binary expression
 // --------------------------------------------------------------------------
 
+pub fn resolveExprLLVMType(convert_data: *ConvertData, node: *ASTNode) []const u8 {
+    if (node.node_type == .Identifier) {
+        if (node.token) |tok| {
+            if (convert_data.var_types.get(tok.value)) |t| return t;
+        }
+    }
+    if (node.node_type == .IntegerLiteral) return "i32";
+    if (node.node_type == .FloatLiteral) return "double";
+    if (node.node_type == .BoolLiteral) return "i1";
+    return "i32";
+}
+
 fn flattenBinaryExpression(
     allocator: *Allocator,
     convert_data: *ConvertData,
@@ -176,25 +200,28 @@ fn flattenBinaryExpression(
 
     const op = node.token.?.value;
 
+    // Determine the LLVM type from operands
+    const llvm_type = resolveExprLLVMType(convert_data, node.left.?);
+
     // Flush sub-statements in order
     statements.appendSlice(allocator.*, left_stmts.items) catch return ConvertError.Out_Of_Memory;
     statements.appendSlice(allocator.*, right_stmts.items) catch return ConvertError.Out_Of_Memory;
 
-    // Comparison -> icmp (i1) + zext to i32
-    if (llvm_utils.convertToLLVMCmp(op)) |pred| {
+    // Comparison -> icmp/fcmp (i1) + zext to type
+    if (llvm_utils.convertToLLVMCmp(op, llvm_type)) |pred| {
         const icmp_reg = try freshReg(allocator, convert_data);
-        const icmp_line = std.fmt.allocPrint(allocator.*, "{s} = {s} {s}, {s}", .{ icmp_reg, pred, lv, rv }) catch return ConvertError.Out_Of_Memory;
+        const icmp_line = std.fmt.allocPrint(allocator.*, "{s} = {s} {s} {s}, {s}", .{ icmp_reg, pred, llvm_type, lv, rv }) catch return ConvertError.Out_Of_Memory;
         statements.append(allocator.*, icmp_line) catch return ConvertError.Out_Of_Memory;
         const ze_reg = try freshReg(allocator, convert_data);
-        const ze_line = std.fmt.allocPrint(allocator.*, "{s} = zext i1 {s} to i32", .{ ze_reg, icmp_reg }) catch return ConvertError.Out_Of_Memory;
+        const ze_line = std.fmt.allocPrint(allocator.*, "{s} = zext i1 {s} to {s}", .{ ze_reg, icmp_reg, llvm_type }) catch return ConvertError.Out_Of_Memory;
         statements.append(allocator.*, ze_line) catch return ConvertError.Out_Of_Memory;
         return ze_reg;
     }
 
     // Arithmetic -> add / sub / mul / ...
-    if (llvm_utils.convertToLLVMOperator(op)) |instr| {
+    if (llvm_utils.convertToLLVMOperator(op, llvm_type)) |instr| {
         const reg = try freshReg(allocator, convert_data);
-        const line = std.fmt.allocPrint(allocator.*, "{s} = {s} {s}, {s}", .{ reg, instr, lv, rv }) catch return ConvertError.Out_Of_Memory;
+        const line = std.fmt.allocPrint(allocator.*, "{s} = {s} {s} {s}, {s}", .{ reg, instr, llvm_type, lv, rv }) catch return ConvertError.Out_Of_Memory;
         statements.append(allocator.*, line) catch return ConvertError.Out_Of_Memory;
         return reg;
     }
@@ -265,6 +292,7 @@ fn flattenFunctionCall(
 
     var args_buf = std.ArrayList(u8).initCapacity(allocator.*, 0) catch return ConvertError.Out_Of_Memory;
 
+    const is_str_fn = std.mem.eql(u8, raw_name, "print") or std.mem.eql(u8, raw_name, "println");
     if (node.children) |children| {
         for (children.items, 0..) |arg_node, i| {
             const expr_node: *ASTNode = if (arg_node.left != null) arg_node.left.? else arg_node;
@@ -274,7 +302,8 @@ fn flattenFunctionCall(
                 statements.append(allocator.*, s) catch return ConvertError.Out_Of_Memory;
             }
             if (i > 0) args_buf.appendSlice(allocator.*, ", ") catch return ConvertError.Out_Of_Memory;
-            const arg_text = std.fmt.allocPrint(allocator.*, "i32 {s}", .{arg_val}) catch return ConvertError.Out_Of_Memory;
+            const arg_type = if (is_str_fn) "i8*" else "i32";
+            const arg_text = std.fmt.allocPrint(allocator.*, "{s} {s}", .{ arg_type, arg_val }) catch return ConvertError.Out_Of_Memory;
             args_buf.appendSlice(allocator.*, arg_text) catch return ConvertError.Out_Of_Memory;
         }
     }
