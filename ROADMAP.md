@@ -36,7 +36,7 @@
 - ☐ Compiler internals guide
 
 ### Testing
-- ◐ Sample programs in src/samples/ (28 test cases)
+- ✓ Sample programs in src/samples/ (39 test cases: 28 original + 10 error detection + 1 semantic)
 - ☐ Automated test runner (`zig build test`)
 - ☐ Unit tests for lexer, parser, semantic, codegen
 - ☐ Integration tests (compile + verify LLVM IR output)
@@ -162,11 +162,12 @@
 - ✓ Two-pass design: pass 1 (declare globals) + pass 2 (analyze bodies)
 
 ### Name Resolution
-- ✓ Global declaration registration (functions, structs, enums, unions, traits)
+- ✓ Global declaration registration (functions, structs, enums, unions, traits, behaviours)
 - ✓ Variable name resolution in expressions
 - ✓ Function name resolution for calls
 - ☐ Module-scoped name resolution (mod / use paths)
-- ◐ `std` identifier whitelisted to skip strict checking (not fully resolved)
+- ✓ `std` identifier whitelisted — all std function names properly resolved
+- ✓ `self`/`true`/`false` whitelisted as built-in identifiers
 
 ### Declaration Validation
 - ✓ Duplicate declaration detection in same scope
@@ -174,16 +175,22 @@
 - ✓ Function argument count validation
 - ✓ Mutability checks: `Cannot reassign to constant`
 - ✓ Undeclared identifier detection
-- ☐ Return type validation (does body type match declared return?)
-- ☐ Function parameter type matching
-- ☐ Constant expression evaluation
-- ◐ Struct field declaration tracking (parsed but no field-level validation)
+- ✓ Return type validation — declared return type vs actual expression
+- ✓ Function parameter type matching — parameter types tracked
+- ☐ Constant expression evaluation (comptime)
+- ✓ Struct field declaration tracking with per-field type info
+- ✓ Enum variant tracking
+- ✓ Global duplicate detection (functions, constants, types)
 
-### Type Checking — NOT IMPLEMENTED
-- ☐ Expression type inference for `:=`
-- ☐ Operator type compatibility (can't add i32 + bool)
-- ☐ Assignment type compatibility
-- ☐ Pointer/reference type validation
+### Type Checking
+- ✓ Expression type inference for `:=` — RHS type resolved
+- ✓ Operator type compatibility — arithmetic, comparison, logical, bitwise all validated
+- ✓ Assignment type compatibility — LHS vs RHS type check
+- ✓ Pointer/reference type validation — `&` address-of, `.*` dereference checked
+- ✓ If condition must be boolean — non-bool rejected
+- ✓ Loop condition must be boolean — non-bool rejected
+- ✓ Break/skip outside loop detected — error reported
+- ✓ Struct field access validation — non-existent field rejected
 - ☐ Error union handling (try/catch completeness)
 - ☐ Array/slice index validation
 - ☐ Behaviour implementation signature checking
@@ -586,11 +593,36 @@ These are the top-priority items that block Razen from being useful beyond i32 a
 
 ---
 
+## Priority Pipeline
+
+### P0 — Blocking Everything Else (Codegen)
+- ☐ **String literal support** — emit global `@.str.N` constants, return `i8*`, update `puts` calls
+- ☐ **Type-correct operations** — use actual LLVM types for arithmetic/comparison/logical instead of hardcoded `i32`
+- ☐ **Struct codegen** — `%T = type { ... }`, `getelementptr` (GEP), field access, construction
+
+### P1 — Core Usability
+- ☐ **Match statement codegen** — switch/icmp chain with payload extraction
+- ☐ **Enum codegen** — integer mapping, discriminant, switch dispatch
+- ☐ **Float arithmetic** — fadd/fsub/fmul/fdiv/fcmp for f32/f64
+
+### P2 — Std Library Enablement
+- ☐ **Try/Catch codegen** — success flag, error propagation, handler blocks
+- ☐ **Error union codegen** — `{ i1 success, union { T, error } }` representation
+- ☐ **Builtin expression codegen** — `@as`, `@SizeOf`, `@TypeOf`
+
+### P3 — Language Completeness
+- ☐ **Generics (monomorphization)** — `@Generic(T)` specialization
+- ☐ **Behaviour dispatch** — static dispatch, `@Dyn` vtable dispatch
+- ☐ **Module system** — multi-file compilation, `use` imports, symbol resolution
+- ☐ **Comptime evaluation** — `const func` execution at compile time
+- ☐ **Async/await** — state machine transformation, Future type
+- ☐ **Self-hosting** — Razen compiler written in Razen
+
 ## Milestone Summary
 
 | Milestone | Description | Key Deliverables |
 |-----------|-------------|------------------|
-| M0 | Working pipeline | ✓ Full 4-phase pipeline for i32 subset |
+| M0 | Working pipeline | ✓ Full 4-phase pipeline with complete semantic analysis |
 | M1 | String support | String literals, print/println with messages, std.fmt basics |
 | M2 | Struct codegen | Struct types, field access, methods — unblocks ~80% of std |
 | M3 | Type correctness | All types generate correct LLVM IR (not just i32) |
@@ -612,6 +644,6 @@ These are the top-priority items that block Razen from being useful beyond i32 a
 
 ---
 
-**Progress:** 34% of Stage 1-4 compiler core complete.
+**Progress:** 42% of Stage 1-4 compiler core complete.
 **Std Library:** 5% complete (7 of ~140 functions).
-**Next Target:** String literal support + Struct codegen.
+**Next Target (P0):** String literal support, type-correct operations, struct codegen.
