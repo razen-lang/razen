@@ -180,12 +180,15 @@ fn flattenBinaryExpression(
     statements.appendSlice(allocator.*, left_stmts.items) catch return ConvertError.Out_Of_Memory;
     statements.appendSlice(allocator.*, right_stmts.items) catch return ConvertError.Out_Of_Memory;
 
-    // Comparison -> icmp
+    // Comparison -> icmp (i1) + zext to i32
     if (llvm_utils.convertToLLVMCmp(op)) |pred| {
-        const reg = try freshReg(allocator, convert_data);
-        const line = std.fmt.allocPrint(allocator.*, "{s} = {s} {s}, {s}", .{ reg, pred, lv, rv }) catch return ConvertError.Out_Of_Memory;
-        statements.append(allocator.*, line) catch return ConvertError.Out_Of_Memory;
-        return reg;
+        const icmp_reg = try freshReg(allocator, convert_data);
+        const icmp_line = std.fmt.allocPrint(allocator.*, "{s} = {s} {s}, {s}", .{ icmp_reg, pred, lv, rv }) catch return ConvertError.Out_Of_Memory;
+        statements.append(allocator.*, icmp_line) catch return ConvertError.Out_Of_Memory;
+        const ze_reg = try freshReg(allocator, convert_data);
+        const ze_line = std.fmt.allocPrint(allocator.*, "{s} = zext i1 {s} to i32", .{ ze_reg, icmp_reg }) catch return ConvertError.Out_Of_Memory;
+        statements.append(allocator.*, ze_line) catch return ConvertError.Out_Of_Memory;
+        return ze_reg;
     }
 
     // Arithmetic -> add / sub / mul / ...

@@ -78,14 +78,12 @@ fn writeFunctionSignature(
     const fn_name = fn_token.value;
 
     // ── return type ────────────────────────────────────────────────────────
-    // AST: node.left = ReturnType  → .left = VarType (token = actual type kw)
     var ret_type: []const u8 = "void";
     if (node.left) |ret_node| {
-        var base = ret_node;
-        while (base.left != null) base = base.left.?;
-        if (base.token) |tok| {
-            if (llvm_utils.convertToLLVMType(tok)) |t| ret_type = t;
-        }
+        // Walk past ReturnType wrapper to get the actual type
+        var actual = ret_node;
+        while (actual.left != null and actual.node_type != .VarType) actual = actual.left.?;
+        ret_type = llvm_utils.resolveTypeNode(actual);
     }
     convert_data.current_ret_type = ret_type;
 
@@ -118,27 +116,18 @@ fn writeParameters(
         }
         const param_name = child.token.?.value;
 
-        // Resolve the parameter type (same recursive walk as return type)
         const type_node = child.left orelse {
             convert_data.error_detail = "Parameter: left (type) is null";
             return ConvertError.Node_Is_Null;
         };
-        var base = type_node;
-        while (base.left != null) base = base.left.?;
+        const param_type = llvm_utils.resolveTypeNode(type_node);
 
-        var param_type: []const u8 = "i32";
-        if (base.token) |tok| {
-            if (llvm_utils.convertToLLVMType(tok)) |t| param_type = t;
-        }
-
-        // In LLVM IR, parameters are plain values: `i32 %name`
         convert_data.generated_code.appendFmt(allocator, "{s} %{s}", .{ param_type, param_name }) catch return ConvertError.Out_Of_Memory;
 
         if (i < child_count - 1) {
             convert_data.generated_code.append(allocator, ", ") catch return ConvertError.Out_Of_Memory;
         }
 
-        // Record parameter name so load codegen can find it
         convert_data.var_types.put(param_name, param_type) catch return ConvertError.Out_Of_Memory;
     }
 }

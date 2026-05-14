@@ -85,11 +85,7 @@ fn processLocalDecl(
     // ── resolve LLVM type ──────────────────────────────────────────────────
     var llvm_type: []const u8 = "i32";
     if (node.left) |type_node| {
-        var base = type_node;
-        while (base.left != null) base = base.left.?;
-        if (base.token) |tok| {
-            if (llvm_utils.convertToLLVMType(tok)) |t| llvm_type = t;
-        }
+        llvm_type = llvm_utils.resolveTypeNode(type_node);
     }
 
     // alloca
@@ -220,6 +216,9 @@ fn processIf(
         convert_data.generated_code.appendFmt(allocator, "\t{s}\n", .{s}) catch return ConvertError.Out_Of_Memory;
     }
 
+    const cond_i1 = try llvm_flatten.freshReg(allocator, convert_data);
+    convert_data.generated_code.appendFmt(allocator, "\t{s} = trunc i32 {s} to i1\n", .{ cond_i1, cond_val }) catch return ConvertError.Out_Of_Memory;
+
     const then_lbl = try freshLabel(allocator, convert_data);
     const merge_lbl = try freshLabel(allocator, convert_data);
 
@@ -231,7 +230,7 @@ fn processIf(
         convert_data.generated_code.appendFmt(
             allocator,
             "\tbr i1 {s}, label %{s}, label %{s}\n",
-            .{ cond_val, then_lbl, else_lbl },
+            .{ cond_i1, then_lbl, else_lbl },
         ) catch return ConvertError.Out_Of_Memory;
 
         convert_data.generated_code.appendFmt(allocator, "{s}:\n", .{then_lbl}) catch return ConvertError.Out_Of_Memory;
@@ -251,7 +250,7 @@ fn processIf(
         convert_data.generated_code.appendFmt(
             allocator,
             "\tbr i1 {s}, label %{s}, label %{s}\n",
-            .{ cond_val, then_lbl, merge_lbl },
+            .{ cond_i1, then_lbl, merge_lbl },
         ) catch return ConvertError.Out_Of_Memory;
 
         convert_data.generated_code.appendFmt(allocator, "{s}:\n", .{then_lbl}) catch return ConvertError.Out_Of_Memory;
